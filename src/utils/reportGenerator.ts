@@ -498,6 +498,19 @@ export function generateHTMLReport(report: Report): string {
         : ""
     }
 
+    ${(() => {
+      const hasRedditSuggestions =
+        report.redditSuggestions && report.redditSuggestions.length > 0;
+      console.log(
+        `[generateHTMLReport] Reddit suggestions check: ${hasRedditSuggestions}, count: ${
+          report.redditSuggestions?.length || 0
+        }`
+      );
+      return hasRedditSuggestions
+        ? generateRedditSuggestionsSection(report.redditSuggestions!)
+        : "";
+    })()}
+
     <div class="footer">
       <p style="margin-bottom: 8px;"><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary.</p>
       <p style="margin: 0;">Presence &copy; ${new Date().getFullYear()}</p>
@@ -546,10 +559,19 @@ ${"-".repeat(60)}
     const mentionedCount = report.chatGPTResponses.filter(
       (r) => r.businessMentioned
     ).length;
-    const avgProbability = report.chatGPTResponses.length > 0
-      ? Math.round(report.chatGPTResponses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) / report.chatGPTResponses.length)
-      : 0;
-    const totalRuns = report.chatGPTResponses.reduce((sum, r) => sum + (r.totalRuns || 1), 0);
+    const avgProbability =
+      report.chatGPTResponses.length > 0
+        ? Math.round(
+            report.chatGPTResponses.reduce(
+              (sum, r) => sum + (r.mentionProbability || 0),
+              0
+            ) / report.chatGPTResponses.length
+          )
+        : 0;
+    const totalRuns = report.chatGPTResponses.reduce(
+      (sum, r) => sum + (r.totalRuns || 1),
+      0
+    );
 
     text += `Prompt Coverage: ${mentionedCount}/${
       report.chatGPTResponses.length
@@ -564,7 +586,9 @@ ${"-".repeat(60)}
       text += `   Status: ${
         response.businessMentioned ? "✓ Mentioned" : "✗ Not Mentioned"
       }\n`;
-      text += `   Probability: ${(response.mentionProbability || 0).toFixed(1)}%\n`;
+      text += `   Probability: ${(response.mentionProbability || 0).toFixed(
+        1
+      )}%\n`;
       if (response.businessMentioned && response.rank) {
         text += `   Average Rank: #${response.rank.toFixed(1)}\n`;
       }
@@ -573,7 +597,9 @@ ${"-".repeat(60)}
       if (response.runs && response.runs.length > 0) {
         text += `   Individual Runs:\n`;
         response.runs.forEach((run: any, runIdx: number) => {
-          const runStatus = run.businessMentioned ? `✓ Mentioned${run.rank ? ` (Rank #${run.rank})` : ''}` : '✗ Not Mentioned';
+          const runStatus = run.businessMentioned
+            ? `✓ Mentioned${run.rank ? ` (Rank #${run.rank})` : ""}`
+            : "✗ Not Mentioned";
           text += `     Run ${runIdx + 1}: ${runStatus}\n`;
         });
       }
@@ -586,11 +612,34 @@ ${"-".repeat(60)}
           text += `     • ${source}\n`;
         });
         if (remainingCount > 0) {
-          text += `     + ${remainingCount} more source${remainingCount > 1 ? 's' : ''}\n`;
+          text += `     + ${remainingCount} more source${
+            remainingCount > 1 ? "s" : ""
+          }\n`;
         }
       }
       text += "\n";
     });
+  }
+
+  if (report.redditSuggestions && report.redditSuggestions.length > 0) {
+    console.log(
+      `[generateTextReport] Including ${report.redditSuggestions.length} Reddit suggestions`
+    );
+    text += `
+REDDIT COMMENT SUGGESTIONS
+${"-".repeat(60)}
+
+Here are suggestions for comments you could post on relevant Reddit threads:
+
+`;
+    report.redditSuggestions.forEach((suggestion, idx) => {
+      text += `${idx + 1}. ${suggestion.title}\n`;
+      text += `   URL: ${suggestion.url}\n`;
+      text += `   Suggested Comment:\n`;
+      text += `   ${suggestion.suggestedComment.split("\n").join("\n   ")}\n\n`;
+    });
+  } else {
+    console.log(`[generateTextReport] No Reddit suggestions to include`);
   }
 
   text += `
@@ -646,16 +695,22 @@ function generateResponseSummary(responses: any[]): string {
       : null;
 
   // Calculate average mention probability across all prompts
-  const avgProbability = responses.length > 0
-    ? Math.round(responses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) / responses.length)
-    : 0;
+  const avgProbability =
+    responses.length > 0
+      ? Math.round(
+          responses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) /
+            responses.length
+        )
+      : 0;
 
   // Calculate visibility score: prompt coverage × avg probability × (1/avg rank)
   // Convert rank to a score where #1 = 1.0, #2 = 0.5, #3 = 0.33, etc.
   let visibilityScore = 0;
   if (avgRank && avgRank > 0) {
     const rankScore = 1 / avgRank;
-    visibilityScore = Math.round((promptCoverage / 100) * (avgProbability / 100) * rankScore * 100);
+    visibilityScore = Math.round(
+      (promptCoverage / 100) * (avgProbability / 100) * rankScore * 100
+    );
   }
 
   return `
@@ -769,12 +824,15 @@ function generateSourceMentionsChart(
  */
 function generateCompetitorAnalysis(responses: any[]): string {
   // Collect all competitors across all runs
-  const competitorStats: Record<string, {
-    mentions: number;
-    avgRank: number;
-    totalRank: number;
-    sources: Set<string>;
-  }> = {};
+  const competitorStats: Record<
+    string,
+    {
+      mentions: number;
+      avgRank: number;
+      totalRank: number;
+      sources: Set<string>;
+    }
+  > = {};
 
   responses.forEach((response) => {
     if (response.runs && Array.isArray(response.runs)) {
@@ -801,7 +859,7 @@ function generateCompetitorAnalysis(responses: any[]): string {
   });
 
   // Calculate average ranks
-  Object.keys(competitorStats).forEach(name => {
+  Object.keys(competitorStats).forEach((name) => {
     const stats = competitorStats[name];
     stats.avgRank = stats.totalRank / stats.mentions;
   });
@@ -817,22 +875,26 @@ function generateCompetitorAnalysis(responses: any[]): string {
     .slice(0, 10); // Top 10 competitors
 
   if (sortedCompetitors.length === 0) {
-    return '';
+    return "";
   }
 
   const maxMentions = sortedCompetitors[0][1].mentions;
 
   const competitorRows = sortedCompetitors
     .map(([name, stats]) => {
-      const percentage = maxMentions > 0 ? (stats.mentions / maxMentions) * 100 : 0;
+      const percentage =
+        maxMentions > 0 ? (stats.mentions / maxMentions) * 100 : 0;
       const barWidth = Math.max(percentage, stats.mentions > 0 ? 2 : 0);
-      const displayName = name.length > 40 ? name.substring(0, 37) + "..." : name;
+      const displayName =
+        name.length > 40 ? name.substring(0, 37) + "..." : name;
 
       return `
       <div class="source-chart-row">
         <div class="source-chart-label">
           ${escapeHTML(displayName)}
-          <div style="font-size: 9px; color: #999; margin-top: 2px;">Avg rank: #${stats.avgRank.toFixed(1)}</div>
+          <div style="font-size: 9px; color: #999; margin-top: 2px;">Avg rank: #${stats.avgRank.toFixed(
+            1
+          )}</div>
         </div>
         <div class="source-chart-bar-container">
           <div class="source-chart-bar-container-inner">
@@ -947,7 +1009,9 @@ function generateResponseCard(response: any, index: number): string {
 
   let rankHTML = "";
   if (isMentioned && response.rank !== null) {
-    rankHTML = `<span class="rank-badge">Avg Rank #${response.rank.toFixed(1)}</span>`;
+    rankHTML = `<span class="rank-badge">Avg Rank #${response.rank.toFixed(
+      1
+    )}</span>`;
   }
 
   // Generate individual runs details
@@ -963,17 +1027,37 @@ function generateResponseCard(response: any, index: number): string {
         // Generate competitor list for this run
         let competitorsHTML = "";
         if (run.competitors && run.competitors.length > 0) {
-          const topCompetitors = run.competitors.slice(0, 5).sort((a: any, b: any) => a.rank - b.rank);
+          const topCompetitors = run.competitors
+            .slice(0, 5)
+            .sort((a: any, b: any) => a.rank - b.rank);
           competitorsHTML = `
             <div style="margin-top: 8px; padding-left: 20px; border-left: 2px solid #e0e0e0;">
               <div style="font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Also Ranked</div>
-              ${topCompetitors.map((comp: any) => `
+              ${topCompetitors
+                .map(
+                  (comp: any) => `
                 <div style="font-size: 11px; margin: 4px 0; color: #333;">
-                  <span style="font-weight: 600;">#${comp.rank}</span> ${escapeHTML(comp.name)}
-                  ${comp.sourceUrl ? `<a href="${escapeHTML(comp.sourceUrl)}" style="color: #666; text-decoration: underline; margin-left: 6px; font-size: 10px;" target="_blank">view source</a>` : ''}
+                  <span style="font-weight: 600;">#${
+                    comp.rank
+                  }</span> ${escapeHTML(comp.name)}
+                  ${
+                    comp.sourceUrl
+                      ? `<a href="${escapeHTML(
+                          comp.sourceUrl
+                        )}" style="color: #666; text-decoration: underline; margin-left: 6px; font-size: 10px;" target="_blank">view source</a>`
+                      : ""
+                  }
                 </div>
-              `).join('')}
-              ${run.competitors.length > 5 ? `<div style="font-size: 10px; color: #999; margin-top: 4px;">+ ${run.competitors.length - 5} more</div>` : ''}
+              `
+                )
+                .join("")}
+              ${
+                run.competitors.length > 5
+                  ? `<div style="font-size: 10px; color: #999; margin-top: 4px;">+ ${
+                      run.competitors.length - 5
+                    } more</div>`
+                  : ""
+              }
             </div>
           `;
         }
@@ -1012,7 +1096,11 @@ function generateResponseCard(response: any, index: number): string {
               )}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
           )
           .join("")}
-        ${remainingCount > 0 ? `<div style="color: #666; font-size: 12px; margin-top: 8px;">+ ${remainingCount} more</div>` : ''}
+        ${
+          remainingCount > 0
+            ? `<div style="color: #666; font-size: 12px; margin-top: 8px;">+ ${remainingCount} more</div>`
+            : ""
+        }
       </div>
     `;
   }
@@ -1028,6 +1116,47 @@ function generateResponseCard(response: any, index: number): string {
       ${runsHTML}
       ${sourcesHTML}
     </div>
+  `;
+}
+
+/**
+ * Generate Reddit suggestions section
+ */
+function generateRedditSuggestionsSection(suggestions: any[]): string {
+  return `
+    <h2>Reddit Comment Suggestions</h2>
+    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Engage with relevant Reddit discussions to increase your visibility</p>
+
+    ${suggestions
+      .map(
+        (suggestion) => `
+    <div class="response-card" style="margin-bottom: 30px;">
+      <h3 style="margin-top: 0; margin-bottom: 12px;">
+        <a href="${escapeHTML(
+          suggestion.url
+        )}" target="_blank" style="color: #000; text-decoration: underline;">
+          ${escapeHTML(suggestion.title)}
+        </a>
+      </h3>
+      <div style="font-size: 11px; color: #666; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px;">
+        <a href="${escapeHTML(
+          suggestion.url
+        )}" target="_blank" style="color: #666; text-decoration: underline;">
+          ${escapeHTML(suggestion.url)}
+        </a>
+      </div>
+      <div style="background-color: #fafafa; padding: 15px; border-left: 3px solid #000; margin-top: 12px;">
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">
+          Suggested Comment
+        </div>
+        <div style="color: #000; line-height: 1.6; white-space: pre-wrap;">${escapeHTML(
+          suggestion.suggestedComment
+        )}</div>
+      </div>
+    </div>
+    `
+      )
+      .join("")}
   `;
 }
 

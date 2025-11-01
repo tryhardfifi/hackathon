@@ -451,4 +451,60 @@ Only return the JSON object, no additional text.`;
       totalRuns: numRuns,
     };
   }
+
+  /**
+   * Generate a comment suggestion for a Reddit post based on the post title,
+   * post content, and business information
+   */
+  async generateRedditCommentSuggestion(
+    redditTitle: string,
+    postContent: string,
+    businessInfo: BusinessInfo
+  ): Promise<string> {
+    const prompt = `You are an expert at crafting helpful, authentic Reddit comments that promote a business without being spammy or overly promotional.
+
+Reddit Post Title:
+${redditTitle}
+
+Reddit Post Content:
+${postContent}
+
+Business Information:
+- Name: ${businessInfo.businessName}
+- Products/Services: ${businessInfo.productsServices}
+- Industry: ${businessInfo.industry}
+- Target Customers: ${businessInfo.targetCustomers}
+
+Your task: Generate a genuine, helpful comment that the business owner could post on this Reddit thread to promote their business. The comment should:
+1. Be authentic and contribute value to the discussion
+2. Naturally mention or relate to their business
+3. Not be overly salesy or promotional
+4. Feel like a real person's comment, not marketing copy
+5. Address what the original post is about and provide helpful, relevant information
+
+Write only the comment text itself - no explanations, no quotes, just the comment that should be posted. Make it 2-4 sentences, conversational and helpful.`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at writing authentic, helpful Reddit comments that naturally promote businesses without being spammy.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.8,
+      });
+
+      const comment = response.choices[0]?.message?.content || '';
+      return comment.trim();
+    } catch (error) {
+      console.error('Failed to generate Reddit comment suggestion:', error);
+      return 'Could not generate comment suggestion.';
+    }
+  }
 }

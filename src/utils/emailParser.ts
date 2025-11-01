@@ -90,6 +90,55 @@ export async function parseBusinessInfo(emailBody: string): Promise<(BusinessInf
 }
 
 /**
+ * Extract Reddit URLs from an array of source URLs (up to maxCount)
+ */
+export function extractRedditUrls(sources: string[], maxCount: number = 3): string[] {
+  const redditUrls: string[] = [];
+  
+  console.log(`[extractRedditUrls] Processing ${sources.length} sources, maxCount: ${maxCount}`);
+  
+  for (let i = 0; i < sources.length && redditUrls.length < maxCount; i++) {
+    const source = sources[i];
+    
+    // Check if URL is a Reddit URL
+    try {
+      const url = new URL(source);
+      const hostname = url.hostname.toLowerCase();
+      
+      console.log(`[extractRedditUrls] Checking source ${i + 1}: ${hostname}${url.pathname}`);
+      
+      if (hostname.includes('reddit.com') || hostname.includes('redd.it')) {
+        console.log(`[extractRedditUrls]   → Reddit domain detected`);
+        
+        // Only include actual post URLs (not subreddit pages, user profiles, etc.)
+        // Matches patterns like: /r/subreddit/comments/postid/title/
+        // Handles double slashes and various path formats
+        // Also matches redd.it short links that resolve to comment threads
+        const normalizedPath = url.pathname.replace(/\/+/g, '/'); // Normalize multiple slashes
+        const isPostUrl = normalizedPath.match(/^\/r\/[^\/]+\/comments\/[^\/]+/i);
+        const isShortLink = hostname.includes('redd.it') && url.pathname.length > 0;
+        
+        if (isPostUrl || isShortLink) {
+          console.log(`[extractRedditUrls]   → ✅ Valid Reddit post URL, adding to list`);
+          // Normalize the URL by removing double slashes before storing
+          const normalizedUrl = url.origin + normalizedPath + (url.search || '');
+          redditUrls.push(normalizedUrl);
+        } else {
+          console.log(`[extractRedditUrls]   → ❌ Reddit URL but not a post (pathname: ${url.pathname}, normalized: ${normalizedPath})`);
+        }
+      }
+    } catch (e) {
+      // Invalid URL, skip
+      console.log(`[extractRedditUrls]   → ❌ Invalid URL format: ${source}`);
+      continue;
+    }
+  }
+  
+  console.log(`[extractRedditUrls] Final result: ${redditUrls.length} Reddit URLs found`);
+  return redditUrls;
+}
+
+/**
  * Format business info as a string for use in AI prompts
  */
 export function formatBusinessInfoForPrompt(info: BusinessInfo): string {

@@ -17,6 +17,8 @@ const BusinessInfoSchema = z.object({
   location: z.string().describe("Physical location or areas they serve"),
 });
 
+// RedditPostSchema removed - now using text extraction instead of structured data
+
 export interface WebsiteExtractionResult {
   success: boolean;
   data?: {
@@ -26,6 +28,15 @@ export interface WebsiteExtractionResult {
     targetMarkets?: string[];
     keyFeatures?: string[];
     location?: string;
+  };
+  error?: string;
+}
+
+export interface RedditPostData {
+  success: boolean;
+  data?: {
+    title: string;
+    content: string;
   };
   error?: string;
 }
@@ -187,5 +198,153 @@ If any information is not available, use empty strings or empty arrays.`;
     }
 
     return summary || "No detailed information extracted from website.";
+  }
+
+  /**
+   * Extract Reddit post data from multiple URLs using a single browser session
+   */
+  async extractRedditPostsData(
+    redditUrls: string[]
+  ): Promise<RedditPostData[]> {
+    if (redditUrls.length === 0) {
+      return [];
+    }
+
+    const results: RedditPostData[] = [];
+    let task: any = null;
+
+    try {
+      console.log(
+        `🔍 Extracting Reddit post data from ${redditUrls.length} URL(s) using single browser session...`
+      );
+
+      // Build instructions for visiting all URLs in sequence
+      const urlList = redditUrls
+        .map((url, idx) => `${idx + 1}. ${url}`)
+        .join("\n");
+
+      const taskPrompt = `You will visit ${redditUrls.length} Reddit posts in sequence using the same browser session.
+
+IMPORTANT: Keep the browser session open and navigate between URLs by changing the URL in the address bar.
+
+For EACH Reddit post, follow these steps:
+1. Navigate to the Reddit post URL (use the address bar to change URLs)
+2. If this is the first page load, check if there is a sign-up modal or popup (like "Sign up", "Join Reddit", or similar overlays). If you see one, close it by clicking the "X" button, "Close" button, or clicking outside the modal.
+3. Extract the title of the Reddit post
+4. Extract the body/content text of the original Reddit post (not comments, just the post itself)
+5. Format the result for this URL as: "URL: [url]\nTITLE: [title]\nCONTENT: [content]\n---"
+
+Reddit URLs to visit:
+${urlList}
+
+After visiting ALL URLs, return all results separated by "---". If a post is locked, deleted, or inaccessible, note that in the result for that URL.
+
+When finished, close the browser session.`;
+
+      task = await this.client.tasks.createTask({
+        task: taskPrompt,
+      });
+
+      console.log(`  Task created: ${task.id}`);
+      console.log(`  Waiting for completion...`);
+
+      const result = await task.complete();
+
+      console.log(`✓ Reddit posts data extraction complete`);
+
+      // Parse text results
+      const text = result.text || result.output || "";
+      console.log(`  Raw text result length: ${text.length} chars`);
+
+      // Split by "---" to get individual post results
+      const postSections = text
+        .split("---")
+        .filter((section: string) => section.trim().length > 0);
+
+      console.log(`  Parsed ${postSections.length} post section(s)`);
+
+      for (let i = 0; i < redditUrls.length; i++) {
+        const url = redditUrls[i];
+        let postData: RedditPostData = {
+          success: false,
+          error: "No data extracted",
+        };
+
+        if (i < postSections.length) {
+          const section = postSections[i];
+
+          // Extract title and content from the section
+          const titleMatch = section.match(/TITLE:\s*(.+?)(?:\n|CONTENT:|$)/is);
+          const contentMatch = section.match(/CONTENT:\s*(.+?)(?:\n---|$)/is);
+
+          if (titleMatch && contentMatch) {
+            const title = titleMatch[1].trim();
+            const content = contentMatch[1].trim();
+
+            console.log(`\n📋 Reddit Post ${i + 1}:`);
+            console.log(`  Title: ${title}`);
+            console.log(`  Content: ${content.substring(0, 100)}...`);
+
+            postData = {
+              success: true,
+              data: {
+                title,
+                content,
+              },
+            };
+          } else {
+            console.warn(`  Could not parse data for URL ${i + 1}`);
+            console.warn(`  Section content: ${section.substring(0, 200)}...`);
+            postData.error =
+              "Could not parse title and content from extraction";
+          }
+        } else {
+          console.warn(`  No data found for URL ${i + 1}`);
+        }
+
+        results.push(postData);
+      }
+
+      return results;
+    } catch (error: any) {
+      console.error(
+        "Error extracting Reddit post data with Browser Use:",
+        error
+      );
+
+      // Return failed results for all URLs
+      if (results.length === 0) {
+        redditUrls.forEach(() => {
+          results.push({
+            success: false,
+            error: error.message || "Failed to extract Reddit post data",
+          });
+        });
+      }
+
+      return results;
+    } finally {
+      // Ensure browser session is closed
+      try {
+        if (task) {
+          // Browser Use SDK should handle cleanup automatically, but we log it
+          console.log(`  Browser session cleanup completed`);
+        }
+      } catch (cleanupError) {
+        console.warn(
+          "  Error during browser session cleanup (non-fatal):",
+          cleanupError
+        );
+      }
+    }
+  }
+
+  /**
+   * Extract Reddit post title and content from a single Reddit URL (legacy method)
+   * @deprecated Use extractRedditPostsData for multiple URLs with session reuse
+   */
+  async extractRedditPostData(redditUrl: string): Promise<RedditPostData> {
+    const results = await this.extractRedditPostsData([redditUrl]);
+    return results[0] || { success: false, error: "No result returned" };
   }
 }

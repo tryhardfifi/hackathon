@@ -49,6 +49,12 @@ export interface ChatGPTResponse {
   totalRuns: number; // Number of times the prompt was run
 }
 
+export interface RedditSuggestion {
+  url: string;
+  title: string;
+  suggestedComment: string;
+}
+
 export interface Report {
   businessName: string;
   generatedDate: string;
@@ -56,6 +62,7 @@ export interface Report {
   visibilityAnalysis: VisibilityAnalysis;
   chatGPTResponses: ChatGPTResponse[];
   recommendations: Recommendation[];
+  redditSuggestions?: RedditSuggestion[];
 }
 
 export interface EmailThread {

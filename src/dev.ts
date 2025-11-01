@@ -7,7 +7,8 @@ import { AgentMailService } from './services/agentmail';
 import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
 import { saveDebugLog, saveDebugLogText } from './utils/debugLogger';
 import { loadDevConfig, saveDevConfig, formatPromptWithDefault } from './utils/devConfig';
-import { Report } from './types';
+import { Report, RedditSuggestion } from './types';
+import { extractRedditUrls } from './utils/emailParser';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -167,6 +168,24 @@ async function main() {
     );
     console.log('\n✓ All prompts processed');
 
+    // Generate Reddit suggestions (requires Browser Use for scraping Reddit)
+    console.log("\n🔍 Generating Reddit comment suggestions...");
+    const browserUseService = new BrowserUseService(); // Always create for Reddit extraction
+    const redditSuggestions = await generateRedditSuggestions(
+      chatGPTResponses,
+      businessInfo,
+      browserUseService
+    );
+    console.log(`✓ Reddit suggestions result: ${redditSuggestions.length} suggestion(s)`);
+    
+    if (redditSuggestions.length > 0) {
+      console.log("  Reddit suggestions details:");
+      redditSuggestions.forEach((suggestion, idx) => {
+        console.log(`    ${idx + 1}. ${suggestion.title}`);
+        console.log(`       URL: ${suggestion.url}`);
+      });
+    }
+
     // Create report
     const report: Report = {
       businessName: businessInfo.businessName,
@@ -179,6 +198,7 @@ async function main() {
       visibilityAnalysis,
       chatGPTResponses,
       recommendations,
+      redditSuggestions: redditSuggestions.length > 0 ? redditSuggestions : undefined,
     };
 
     // Generate reports
@@ -242,6 +262,132 @@ async function main() {
   } finally {
     rl.close();
   }
+}
+
+/**
+ * Generate Reddit comment suggestions based on Reddit URLs found in sources
+ */
+async function generateRedditSuggestions(
+  chatGPTResponses: any[],
+  businessInfo: any,
+  browserUseService: BrowserUseService
+): Promise<RedditSuggestion[]> {
+  console.log("\n🔍 Starting Reddit suggestions generation...");
+  console.log(`  Total chatGPTResponses: ${chatGPTResponses.length}`);
+
+  // Collect all unique sources from all responses
+  const allSources = new Set<string>();
+  chatGPTResponses.forEach((response, idx) => {
+    if (response.sources && Array.isArray(response.sources)) {
+      console.log(`  Response ${idx + 1}: ${response.sources.length} sources`);
+      response.sources.forEach((source: string) => {
+        if (source) {
+          allSources.add(source);
+        }
+      });
+    } else {
+      console.log(`  Response ${idx + 1}: No sources array found`);
+    }
+  });
+
+  console.log(`  Total unique sources collected: ${allSources.size}`);
+  if (allSources.size > 0) {
+    console.log(`  Sample sources (first 5):`);
+    Array.from(allSources).slice(0, 5).forEach((source, idx) => {
+      console.log(`    ${idx + 1}. ${source}`);
+    });
+  }
+
+  // Extract up to 3 Reddit URLs
+  const redditUrls = extractRedditUrls(Array.from(allSources), 3);
+
+  console.log(`\n  Reddit URL extraction result: ${redditUrls.length} URLs found`);
+  if (redditUrls.length > 0) {
+    redditUrls.forEach((url, idx) => {
+      console.log(`    ${idx + 1}. ${url}`);
+    });
+  } else {
+    console.log("  No Reddit URLs found. Checking all sources for Reddit patterns...");
+    Array.from(allSources).forEach((source) => {
+      if (source.includes('reddit') || source.includes('redd.it')) {
+        console.log(`    Found potential Reddit source (but didn't match pattern): ${source}`);
+      }
+    });
+  }
+
+  if (redditUrls.length === 0) {
+    console.log("  ❌ No Reddit URLs found in sources - skipping Reddit suggestions");
+    return [];
+  }
+
+  // Process all Reddit URLs in a single browser session
+  const suggestions: RedditSuggestion[] = [];
+
+  try {
+    console.log(`\n  Processing ${redditUrls.length} Reddit URL(s) in a single browser session...`);
+
+    // Fetch all Reddit post data using Browser Use in one session
+    console.log(`    Step 1: Fetching Reddit post data with Browser Use (single session)...`);
+    const redditDataResults = await browserUseService.extractRedditPostsData(redditUrls);
+
+    // Process each result
+    for (let i = 0; i < redditUrls.length; i++) {
+      const redditUrl = redditUrls[i];
+      const redditData = redditDataResults[i];
+
+      if (!redditData || !redditData.success || !redditData.data) {
+        console.log(`    ❌ Failed to extract Reddit data for URL ${i + 1}: ${redditData?.error || 'Unknown error'}`);
+        continue;
+      }
+
+      console.log(`    ✓ Extracted Reddit data for URL ${i + 1}:`);
+      console.log(`      Title: ${redditData.data.title}`);
+      console.log(`      Content: ${redditData.data.content.substring(0, 100)}...`);
+
+      try {
+        // Generate comment suggestion using GPT
+        console.log(`    Step 2: Generating comment suggestion with GPT for URL ${i + 1}...`);
+        const openAIService = new OpenAIService();
+        const suggestedComment = await openAIService.generateRedditCommentSuggestion(
+          redditData.data.title,
+          redditData.data.content,
+          businessInfo
+        );
+
+        if (!suggestedComment || suggestedComment.trim().length === 0) {
+          console.log(`    ❌ Generated empty comment suggestion for URL ${i + 1}`);
+          continue;
+        }
+
+        console.log(`    ✓ Generated comment suggestion (${suggestedComment.length} chars)`);
+        console.log(`      Preview: ${suggestedComment.substring(0, 100)}...`);
+
+        suggestions.push({
+          url: redditUrl,
+          title: redditData.data.title,
+          suggestedComment,
+        });
+
+        console.log(`    ✅ Successfully created suggestion ${suggestions.length}/${redditUrls.length}`);
+      } catch (error) {
+        console.error(`    ❌ Error generating comment suggestion for URL ${i + 1}:`, error);
+        if (error instanceof Error) {
+          console.error(`      Error message: ${error.message}`);
+        }
+        // Continue with other URLs even if one fails
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error(`    ❌ Error processing Reddit URLs:`, error);
+    if (error instanceof Error) {
+      console.error(`      Error message: ${error.message}`);
+      console.error(`      Error stack: ${error.stack}`);
+    }
+  }
+
+  console.log(`\n✓ Reddit suggestions generation complete: ${suggestions.length} suggestion(s) created`);
+  return suggestions;
 }
 
 main();
