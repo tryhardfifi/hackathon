@@ -7,9 +7,15 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "send-mock-report": "ts-node src/scripts/sendMockReport.ts"
   },
-  "keywords": ["agentmail", "openai", "email-agent", "visibility-report"],
+  "keywords": [
+    "agentmail",
+    "openai",
+    "email-agent",
+    "visibility-report"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

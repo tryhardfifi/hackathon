@@ -4,20 +4,6 @@ import { Report, CustomerPrompt } from '../types';
  * Generate HTML report
  */
 export function generateHTMLReport(report: Report): string {
-  const promptsByCategory = groupPromptsByCategory(report.customerPrompts);
-
-  let promptsHTML = '';
-  for (const [category, prompts] of Object.entries(promptsByCategory)) {
-    promptsHTML += `
-      <div class="category">
-        <h3>${escapeHTML(category)}</h3>
-        <ul>
-          ${prompts.map((p) => `<li>${escapeHTML(p.prompt)}</li>`).join('\n')}
-        </ul>
-      </div>
-    `;
-  }
-
   const visibilityClass = report.visibilityAnalysis.overallAssessment.toLowerCase();
 
   return `
@@ -130,6 +116,104 @@ export function generateHTMLReport(report: Report): string {
       font-weight: bold;
       margin-left: 8px;
     }
+    .response-card {
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .response-card.mentioned {
+      border-left: 4px solid #4CAF50;
+    }
+    .response-card.not-mentioned {
+      border-left: 4px solid #e0e0e0;
+    }
+    .response-prompt {
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 12px;
+      font-size: 15px;
+    }
+    .response-status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .response-status.mentioned {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .response-status.not-mentioned {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .rank-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+      margin-left: 8px;
+    }
+    .sources {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .sources-label {
+      font-size: 12px;
+      color: #666;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .source-link {
+      display: inline-block;
+      color: #2196F3;
+      text-decoration: none;
+      font-size: 13px;
+      margin: 4px 8px 4px 0;
+      padding: 4px 8px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .source-link:hover {
+      background-color: #e8f5e9;
+      text-decoration: underline;
+    }
+    .stats-summary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -140,9 +224,16 @@ export function generateHTMLReport(report: Report): string {
       Generated: ${report.generatedDate}
     </div>
 
-    <h2>📝 Customer Prompt Examples</h2>
-    <p>Here are realistic prompts that potential customers might use when asking ChatGPT for recommendations:</p>
-    ${promptsHTML}
+    ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? `
+    <h2>🎯 ChatGPT Response Analysis</h2>
+    <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
+    
+    ${generateResponseSummary(report.chatGPTResponses)}
+    
+    <div class="section">
+      ${report.chatGPTResponses.map((response, idx) => generateResponseCard(response, idx)).join('\n')}
+    </div>
+    ` : ''}
 
     <h2>🔍 Visibility Analysis</h2>
     <div class="section">
@@ -222,6 +313,31 @@ asking ChatGPT for recommendations:
     text += '\n';
   }
 
+  if (report.chatGPTResponses && report.chatGPTResponses.length > 0) {
+    text += `
+CHATGPT RESPONSE ANALYSIS
+${'-'.repeat(60)}
+
+`;
+    const mentionedCount = report.chatGPTResponses.filter(r => r.businessMentioned).length;
+    text += `Mention Rate: ${mentionedCount}/${report.chatGPTResponses.length} (${Math.round((mentionedCount / report.chatGPTResponses.length) * 100)}%)\n\n`;
+
+    report.chatGPTResponses.forEach((response, idx) => {
+      text += `${idx + 1}. ${response.prompt}\n`;
+      text += `   Status: ${response.businessMentioned ? '✓ Mentioned' : '✗ Not Mentioned'}\n`;
+      if (response.businessMentioned && response.rank) {
+        text += `   Rank: #${response.rank}\n`;
+      }
+      if (response.sources && response.sources.length > 0) {
+        text += `   Sources:\n`;
+        response.sources.forEach((source: string) => {
+          text += `     • ${source}\n`;
+        });
+      }
+      text += '\n';
+    });
+  }
+
   text += `
 VISIBILITY ANALYSIS
 ${'-'.repeat(60)}
@@ -281,6 +397,81 @@ function groupPromptsByCategory(prompts: CustomerPrompt[]): Record<string, Custo
   }
 
   return grouped;
+}
+
+/**
+ * Generate response summary statistics
+ */
+function generateResponseSummary(responses: any[]): string {
+  const mentionedCount = responses.filter(r => r.businessMentioned).length;
+  const totalResponses = responses.length;
+  const mentionPercentage = totalResponses > 0 ? Math.round((mentionedCount / totalResponses) * 100) : 0;
+  
+  const mentionedResponses = responses.filter(r => r.businessMentioned);
+  const avgRank = mentionedResponses.length > 0
+    ? Math.round(mentionedResponses.reduce((sum, r) => sum + (r.rank || 0), 0) / mentionedResponses.length * 10) / 10
+    : null;
+  
+  const topRankCount = mentionedResponses.filter(r => r.rank === 1).length;
+
+  return `
+    <div class="stats-summary">
+      <div class="stat-item">
+        <div class="stat-value">${mentionPercentage}%</div>
+        <div class="stat-label">Mention Rate</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${mentionedCount}/${totalResponses}</div>
+        <div class="stat-label">Times Mentioned</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${avgRank !== null ? `#${avgRank}` : 'N/A'}</div>
+        <div class="stat-label">Avg Rank</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${topRankCount}</div>
+        <div class="stat-label">Top Rank (#1)</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Generate a single response card
+ */
+function generateResponseCard(response: any, index: number): string {
+  const isMentioned = response.businessMentioned;
+  const cardClass = isMentioned ? 'mentioned' : 'not-mentioned';
+  const statusClass = isMentioned ? 'mentioned' : 'not-mentioned';
+  const statusText = isMentioned ? '✓ Mentioned' : '✗ Not Mentioned';
+  
+  let rankHTML = '';
+  if (isMentioned && response.rank !== null) {
+    rankHTML = `<span class="rank-badge">Rank #${response.rank}</span>`;
+  }
+
+  let sourcesHTML = '';
+  if (response.sources && response.sources.length > 0) {
+    sourcesHTML = `
+      <div class="sources">
+        <div class="sources-label">Sources Used:</div>
+        ${response.sources.map((source: string) => 
+          `<a href="${escapeHTML(source)}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
+        ).join('')}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="response-card ${cardClass}">
+      <div class="response-prompt">${escapeHTML(response.prompt)}</div>
+      <div>
+        <span class="response-status ${statusClass}">${statusText}</span>
+        ${rankHTML}
+      </div>
+      ${sourcesHTML}
+    </div>
+  `;
 }
 
 /**

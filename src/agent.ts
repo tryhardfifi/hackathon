@@ -1,9 +1,16 @@
-import { AgentMailService } from './services/agentmail';
-import { AgentMailWebSocketService, WebSocketEvent } from './services/websocket';
-import { OpenAIService } from './services/openai';
-import { parseBusinessInfo } from './utils/emailParser';
-import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
-import { Report } from './types';
+import { AgentMailService } from "./services/agentmail";
+import {
+  AgentMailWebSocketService,
+  WebSocketEvent,
+} from "./services/websocket";
+import { OpenAIService } from "./services/openai";
+import { parseBusinessInfo } from "./utils/emailParser";
+import {
+  generateHTMLReport,
+  generateTextReport,
+} from "./utils/reportGenerator";
+import { generateMockChatGPTResponses } from "./utils/mockDataGenerator";
+import { Report } from "./types";
 
 export class VisibilityReportAgent {
   private agentMailService: AgentMailService;
@@ -39,22 +46,26 @@ export class VisibilityReportAgent {
       console.log(`  Subject: ${message.subject}`);
 
       // Check if it has the unread label and NOT the replied label
-      const hasUnread = message.labels && message.labels.includes('unread');
-      const hasReplied = message.labels && message.labels.includes('replied');
+      const hasUnread = message.labels && message.labels.includes("unread");
+      const hasReplied = message.labels && message.labels.includes("replied");
 
       if (!hasUnread || hasReplied) {
-        console.log(`Message ${messageId} already processed (unread: ${hasUnread}, replied: ${hasReplied}), skipping`);
+        console.log(
+          `Message ${messageId} already processed (unread: ${hasUnread}, replied: ${hasReplied}), skipping`
+        );
         this.processingMessages.delete(messageId);
         return false;
       }
 
       // Parse business information from email using OpenAI
       const emailBody = this.agentMailService.getMessageText(message);
-      console.log('Parsing business info with OpenAI...');
+      console.log("Parsing business info with OpenAI...");
       const businessInfo = await parseBusinessInfo(emailBody);
 
       if (!businessInfo) {
-        console.log('Failed to parse business information, sending error response');
+        console.log(
+          "Failed to parse business information, sending error response"
+        );
         const fromEmail = this.agentMailService.getMessageFrom(message);
         await this.sendErrorResponse(messageId, fromEmail, emailBody);
         this.processingMessages.delete(messageId);
@@ -64,46 +75,65 @@ export class VisibilityReportAgent {
       console.log(`Processing report for: ${businessInfo.businessName}`);
 
       // Generate report using OpenAI
-      console.log('Generating customer prompts...');
-      const customerPrompts = await this.openAIService.generateCustomerPrompts(businessInfo);
+      console.log("Generating customer prompts...");
+      const customerPrompts = await this.openAIService.generateCustomerPrompts(
+        businessInfo
+      );
 
-      console.log('Analyzing visibility...');
-      const visibilityAnalysis = await this.openAIService.analyzeVisibility(businessInfo);
+      console.log("Analyzing visibility...");
+      const visibilityAnalysis = await this.openAIService.analyzeVisibility(
+        businessInfo
+      );
 
-      console.log('Creating recommendations...');
+      console.log("Creating recommendations...");
       const recommendations = await this.openAIService.generateRecommendations(
         businessInfo,
         visibilityAnalysis
       );
 
+      // Generate mock ChatGPT response data
+      const chatGPTResponses = generateMockChatGPTResponses(
+        businessInfo,
+        customerPrompts
+      );
+
       // Create report
       const report: Report = {
         businessName: businessInfo.businessName,
-        generatedDate: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
+        generatedDate: new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
         }),
         customerPrompts,
         visibilityAnalysis,
+        chatGPTResponses,
         recommendations,
       };
 
       // Generate HTML and text versions
-      console.log('Generating report...');
+      console.log("Generating report...");
       const htmlReport = generateHTMLReport(report);
       const textReport = generateTextReport(report);
 
       // Send reply
-      console.log('Sending reply...');
-      await this.agentMailService.replyToMessage(messageId, htmlReport, textReport);
+      console.log("Sending reply...");
+      await this.agentMailService.replyToMessage(
+        messageId,
+        htmlReport,
+        textReport
+      );
 
       // Wait a moment before updating labels (gives AgentMail time to process)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Update labels
-      console.log('Updating labels...');
-      await this.agentMailService.updateMessageLabels(messageId, ['replied'], ['unread']);
+      console.log("Updating labels...");
+      await this.agentMailService.updateMessageLabels(
+        messageId,
+        ["replied"],
+        ["unread"]
+      );
 
       console.log(`✓ Successfully processed message ${messageId}`);
       this.processingMessages.delete(messageId);
@@ -113,9 +143,16 @@ export class VisibilityReportAgent {
 
       // Try to label as error (non-fatal if it fails)
       try {
-        await this.agentMailService.updateMessageLabels(messageId, ['error'], ['unread']);
+        await this.agentMailService.updateMessageLabels(
+          messageId,
+          ["error"],
+          ["unread"]
+        );
       } catch (labelError: any) {
-        console.warn('⚠️  Could not add error label (non-fatal):', labelError?.message || labelError);
+        console.warn(
+          "⚠️  Could not add error label (non-fatal):",
+          labelError?.message || labelError
+        );
       }
 
       this.processingMessages.delete(messageId);
@@ -126,7 +163,11 @@ export class VisibilityReportAgent {
   /**
    * Send an error response when parsing fails
    */
-  private async sendErrorResponse(messageId: string, fromEmail: string, emailBody: string): Promise<void> {
+  private async sendErrorResponse(
+    messageId: string,
+    fromEmail: string,
+    emailBody: string
+  ): Promise<void> {
     // Use OpenAI to generate a helpful, contextual error response
     const systemPrompt = `You are a helpful assistant for the GPT Visibility Report service. Generate a friendly error message explaining that we need more information to create their report.
 
@@ -149,7 +190,10 @@ ${emailBody}
 Generate a helpful HTML and plain text error response.`;
 
     try {
-      const response = await this.openAIService.generateCustomResponse(systemPrompt, userPrompt);
+      const response = await this.openAIService.generateCustomResponse(
+        systemPrompt,
+        userPrompt
+      );
 
       const htmlError = `
 <!DOCTYPE html>
@@ -165,7 +209,7 @@ Generate a helpful HTML and plain text error response.`;
 <body>
   <div class="container">
     <h2>Thanks for reaching out!</h2>
-    ${response.html || '<p>' + response.text.replace(/\n/g, '</p><p>') + '</p>'}
+    ${response.html || "<p>" + response.text.replace(/\n/g, "</p><p>") + "</p>"}
     <hr>
     <p><small>Reply to this email with your business information and we'll generate your GPT Visibility Report!</small></p>
   </div>
@@ -173,12 +217,18 @@ Generate a helpful HTML and plain text error response.`;
 </html>
       `.trim();
 
-      const textError = response.text + '\n\nReply to this email with your business information and we\'ll generate your GPT Visibility Report!';
+      const textError =
+        response.text +
+        "\n\nReply to this email with your business information and we'll generate your GPT Visibility Report!";
 
-      await this.agentMailService.replyToMessage(messageId, htmlError, textError);
+      await this.agentMailService.replyToMessage(
+        messageId,
+        htmlError,
+        textError
+      );
     } catch (error) {
       // Fallback to simple error message if OpenAI fails
-      console.error('Error generating custom error response:', error);
+      console.error("Error generating custom error response:", error);
 
       const htmlError = `
 <!DOCTYPE html>
@@ -216,16 +266,27 @@ We need a bit more information. Please include:
 
 Reply with this information and we'll generate your report!`;
 
-      await this.agentMailService.replyToMessage(messageId, htmlError, textError);
+      await this.agentMailService.replyToMessage(
+        messageId,
+        htmlError,
+        textError
+      );
     }
 
     // Wait a moment before updating labels
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     try {
-      await this.agentMailService.updateMessageLabels(messageId, ['replied', 'error'], ['unread']);
+      await this.agentMailService.updateMessageLabels(
+        messageId,
+        ["replied", "error"],
+        ["unread"]
+      );
     } catch (error: any) {
-      console.warn('⚠️  Could not update labels after error response:', error?.message || error);
+      console.warn(
+        "⚠️  Could not update labels after error response:",
+        error?.message || error
+      );
     }
   }
 
@@ -239,7 +300,7 @@ Reply with this information and we'll generate your report!`;
     if (event.messageId) {
       await this.processMessageById(event.messageId);
     } else {
-      console.error('Message event missing messageId');
+      console.error("Message event missing messageId");
     }
   }
 
@@ -248,12 +309,14 @@ Reply with this information and we'll generate your report!`;
    */
   async processExistingUnrepliedMessages(): Promise<void> {
     try {
-      console.log('Checking for existing unread messages...');
+      console.log("Checking for existing unread messages...");
 
-      const messages = await this.agentMailService.getMessagesWithLabel('unread');
+      const messages = await this.agentMailService.getMessagesWithLabel(
+        "unread"
+      );
 
       if (messages.length === 0) {
-        console.log('No existing unread messages found');
+        console.log("No existing unread messages found");
         return;
       }
 
@@ -266,7 +329,7 @@ Reply with this information and we'll generate your report!`;
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
-      console.error('Error processing existing messages:', error);
+      console.error("Error processing existing messages:", error);
     }
   }
 
@@ -274,24 +337,24 @@ Reply with this information and we'll generate your report!`;
    * Start the agent with WebSocket connection
    */
   async start(): Promise<void> {
-    console.log('🤖 GPT Visibility Report Agent started');
-    console.log('Using WebSocket for real-time notifications\n');
+    console.log("🤖 GPT Visibility Report Agent started");
+    console.log("Using WebSocket for real-time notifications\n");
 
     // Set up WebSocket event handlers
-    this.websocketService.on('message_received', (event: WebSocketEvent) => {
+    this.websocketService.on("message_received", (event: WebSocketEvent) => {
       this.handleMessageReceived(event);
     });
 
-    this.websocketService.on('error', (error: Error) => {
-      console.error('WebSocket error:', error);
+    this.websocketService.on("error", (error: Error) => {
+      console.error("WebSocket error:", error);
     });
 
-    this.websocketService.on('server_error', (error: any) => {
-      console.error('Server error:', error);
+    this.websocketService.on("server_error", (error: any) => {
+      console.error("Server error:", error);
     });
 
-    this.websocketService.on('max_reconnect_reached', () => {
-      console.error('Maximum reconnection attempts reached. Exiting...');
+    this.websocketService.on("max_reconnect_reached", () => {
+      console.error("Maximum reconnection attempts reached. Exiting...");
       process.exit(1);
     });
 
@@ -305,15 +368,15 @@ Reply with this information and we'll generate your report!`;
     }, 2000);
 
     // Keep the process running
-    console.log('\n✓ Agent is running and listening for new messages...');
-    console.log('Press Ctrl+C to stop\n');
+    console.log("\n✓ Agent is running and listening for new messages...");
+    console.log("Press Ctrl+C to stop\n");
   }
 
   /**
    * Stop the agent and clean up
    */
   stop(): void {
-    console.log('\nStopping agent...');
+    console.log("\nStopping agent...");
     this.websocketService.close();
   }
 }
