@@ -55,6 +55,11 @@ export interface RedditSuggestion {
   suggestedComment: string;
 }
 
+export interface SEOContentIdea {
+  title: string;
+  description: string;
+}
+
 export interface Report {
   businessName: string;
   generatedDate: string;
@@ -63,6 +68,7 @@ export interface Report {
   chatGPTResponses: ChatGPTResponse[];
   recommendations: Recommendation[];
   redditSuggestions?: RedditSuggestion[];
+  seoContentIdeas?: SEOContentIdea[];
 }
 
 export interface EmailThread {

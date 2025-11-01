@@ -511,6 +511,19 @@ export function generateHTMLReport(report: Report): string {
         : "";
     })()}
 
+    ${(() => {
+      const hasSEOIdeas =
+        report.seoContentIdeas && report.seoContentIdeas.length > 0;
+      console.log(
+        `[generateHTMLReport] SEO content ideas check: ${hasSEOIdeas}, count: ${
+          report.seoContentIdeas?.length || 0
+        }`
+      );
+      return hasSEOIdeas
+        ? generateSEOContentIdeasSection(report.seoContentIdeas!)
+        : "";
+    })()}
+
     <div class="footer">
       <p style="margin-bottom: 8px;"><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary.</p>
       <p style="margin: 0;">Presence &copy; ${new Date().getFullYear()}</p>
@@ -640,6 +653,25 @@ Here are suggestions for comments you could post on relevant Reddit threads:
     });
   } else {
     console.log(`[generateTextReport] No Reddit suggestions to include`);
+  }
+
+  if (report.seoContentIdeas && report.seoContentIdeas.length > 0) {
+    console.log(
+      `[generateTextReport] Including ${report.seoContentIdeas.length} SEO content ideas`
+    );
+    text += `
+SEO CONTENT IDEAS
+${"-".repeat(60)}
+
+Blog post ideas optimized based on sources being quoted by AI:
+
+`;
+    report.seoContentIdeas.forEach((idea, idx) => {
+      text += `${idx + 1}. ${idea.title}\n`;
+      text += `   ${idea.description}\n\n`;
+    });
+  } else {
+    console.log(`[generateTextReport] No SEO content ideas to include`);
   }
 
   text += `
@@ -1152,6 +1184,31 @@ function generateRedditSuggestionsSection(suggestions: any[]): string {
         <div style="color: #000; line-height: 1.6; white-space: pre-wrap;">${escapeHTML(
           suggestion.suggestedComment
         )}</div>
+      </div>
+    </div>
+    `
+      )
+      .join("")}
+  `;
+}
+
+/**
+ * Generate SEO content ideas section
+ */
+function generateSEOContentIdeasSection(ideas: any[]): string {
+  return `
+    <h2>SEO Content Ideas</h2>
+    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Blog post ideas optimized based on sources being quoted by AI</p>
+
+    ${ideas
+      .map(
+        (idea, idx) => `
+    <div class="response-card" style="margin-bottom: 25px;">
+      <h3 style="margin-top: 0; margin-bottom: 12px; color: #000;">
+        ${idx + 1}. ${escapeHTML(idea.title)}
+      </h3>
+      <div style="color: #666; line-height: 1.6; font-size: 14px;">
+        ${escapeHTML(idea.description)}
       </div>
     </div>
     `

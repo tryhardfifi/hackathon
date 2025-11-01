@@ -7,7 +7,7 @@ import { AgentMailService } from './services/agentmail';
 import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
 import { saveDebugLog, saveDebugLogText } from './utils/debugLogger';
 import { loadDevConfig, saveDevConfig, formatPromptWithDefault } from './utils/devConfig';
-import { Report, RedditSuggestion } from './types';
+import { Report, RedditSuggestion, SEOContentIdea } from './types';
 import { extractRedditUrls } from './utils/emailParser';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -186,6 +186,15 @@ async function main() {
       });
     }
 
+    // Generate SEO content ideas
+    console.log("\n📝 Generating SEO content ideas based on sources...");
+    const seoContentIdeas = await generateSEOContentIdeas(
+      chatGPTResponses,
+      businessInfo,
+      openAIService
+    );
+    console.log(`✓ Generated ${seoContentIdeas.length} SEO content idea(s)`);
+
     // Create report
     const report: Report = {
       businessName: businessInfo.businessName,
@@ -199,6 +208,7 @@ async function main() {
       chatGPTResponses,
       recommendations,
       redditSuggestions: redditSuggestions.length > 0 ? redditSuggestions : undefined,
+      seoContentIdeas: seoContentIdeas.length > 0 ? seoContentIdeas : undefined,
     };
 
     // Generate reports
@@ -388,6 +398,45 @@ async function generateRedditSuggestions(
 
   console.log(`\n✓ Reddit suggestions generation complete: ${suggestions.length} suggestion(s) created`);
   return suggestions;
+}
+
+/**
+ * Generate SEO content ideas based on sources that are being quoted
+ */
+async function generateSEOContentIdeas(
+  chatGPTResponses: any[],
+  businessInfo: any,
+  openAIService: OpenAIService
+): Promise<SEOContentIdea[]> {
+  // Collect all unique sources from all responses
+  const allSources = new Set<string>();
+  chatGPTResponses.forEach((response) => {
+    if (response.sources && Array.isArray(response.sources)) {
+      response.sources.forEach((source: string) => {
+        if (source) {
+          allSources.add(source);
+        }
+      });
+    }
+  });
+
+  if (allSources.size === 0) {
+    console.log("  No sources found - skipping SEO content ideas");
+    return [];
+  }
+
+  console.log(`  Found ${allSources.size} unique sources`);
+  
+  try {
+    const seoIdeas = await openAIService.generateSEOContentIdeas(
+      Array.from(allSources),
+      businessInfo
+    );
+    return seoIdeas;
+  } catch (error) {
+    console.error(`  Error generating SEO content ideas:`, error);
+    return [];
+  }
 }
 
 main();

@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../config';
-import { BusinessInfo, CustomerPrompt, VisibilityAnalysis, Recommendation, ChatGPTResponse, SingleRunResult } from '../types';
+import { BusinessInfo, CustomerPrompt, VisibilityAnalysis, Recommendation, ChatGPTResponse, SingleRunResult, SEOContentIdea } from '../types';
 import { formatBusinessInfoForPrompt } from '../utils/emailParser';
 
 export class OpenAIService {
@@ -505,6 +505,116 @@ Write only the comment text itself - no explanations, no quotes, just the commen
     } catch (error) {
       console.error('Failed to generate Reddit comment suggestion:', error);
       return 'Could not generate comment suggestion.';
+    }
+  }
+
+  /**
+   * Generate SEO content ideas based on sources that are being quoted
+   */
+  async generateSEOContentIdeas(
+    sources: string[],
+    businessInfo: BusinessInfo
+  ): Promise<SEOContentIdea[]> {
+    // Analyze the domains and topics from sources
+    const domains = new Set<string>();
+    sources.forEach((source) => {
+      try {
+        const url = new URL(source);
+        const domain = url.hostname.replace(/^www\./, '');
+        domains.add(domain);
+      } catch (e) {
+        // Skip invalid URLs
+      }
+    });
+
+    const topDomains = Array.from(domains).slice(0, 10).join(', ');
+
+    const prompt = `You are an SEO expert. Based on the sources that are being quoted and referenced for "${businessInfo.businessName}", generate 5 blog post ideas that would help improve their AI visibility.
+
+Business Information:
+- Name: ${businessInfo.businessName}
+- Products/Services: ${businessInfo.productsServices}
+- Industry: ${businessInfo.industry}
+- Target Customers: ${businessInfo.targetCustomers}
+
+Top Source Domains Being Referenced:
+${topDomains}
+
+Sources Being Quoted (sample):
+${sources.slice(0, 20).map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+Generate 5 SEO-optimized blog post ideas that:
+1. Address topics similar to what the top sources cover
+2. Would naturally be referenced by AI assistants when answering relevant queries
+3. Are tailored to the business's industry and target customers
+4. Are actionable and valuable content that would rank well
+
+Return the response as a JSON array with objects containing "title" and "description" fields. Each description should be one sentence explaining what to include in the blog post.
+
+Example format:
+[
+  {
+    "title": "How to Choose the Right [Topic] for Your Business",
+    "description": "Create a comprehensive guide covering [specific points] that addresses common questions your target audience has."
+  }
+]
+
+Only return the JSON array, no additional text.`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an SEO expert specializing in content strategy that improves AI assistant visibility.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.8,
+      });
+
+      const content = response.choices[0]?.message?.content || '[]';
+      
+      // Try to parse as JSON array
+      let parsed: any;
+      try {
+        // First try direct parsing
+        parsed = JSON.parse(content);
+        if (Array.isArray(parsed)) {
+          return parsed.slice(0, 5);
+        }
+        // If wrapped in an object, extract the array
+        if (parsed.ideas && Array.isArray(parsed.ideas)) {
+          return parsed.ideas.slice(0, 5);
+        }
+        if (parsed.contentIdeas && Array.isArray(parsed.contentIdeas)) {
+          return parsed.contentIdeas.slice(0, 5);
+        }
+      } catch (e) {
+        // Try to extract JSON array from the response text
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed)) {
+              return parsed.slice(0, 5);
+            }
+          } catch (parseError) {
+            // Fall through to warning
+          }
+        }
+      }
+
+      // Fallback: return empty array if parsing fails
+      console.warn('Failed to parse SEO content ideas, returning empty array');
+      return [];
+    } catch (error) {
+      console.error('Failed to generate SEO content ideas:', error);
+      return [];
     }
   }
 }
