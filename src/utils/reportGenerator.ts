@@ -191,28 +191,36 @@ export function generateHTMLReport(report: Report): string {
       text-decoration: underline;
     }
     .stats-summary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 30px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
+      width: 100%;
+      margin: 30px 0;
+      border-collapse: separate;
+      border-spacing: 15px;
     }
     .stat-item {
+      background-color: #f8f9fa;
+      border: 2px solid #e0e0e0;
+      color: #333;
+      padding: 20px;
+      border-radius: 8px;
       text-align: center;
+      width: 25%;
+    }
+    .stat-emoji {
+      font-size: 32px;
+      margin-bottom: 10px;
+      display: block;
     }
     .stat-value {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 8px;
     }
     .stat-label {
       font-size: 12px;
-      opacity: 0.9;
+      opacity: 0.95;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+      font-weight: 500;
     }
   </style>
 </head>
@@ -224,11 +232,11 @@ export function generateHTMLReport(report: Report): string {
       Generated: ${report.generatedDate}
     </div>
 
+    ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? generateResponseSummary(report.chatGPTResponses) : ''}
+
     ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? `
     <h2>🎯 ChatGPT Response Analysis</h2>
     <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
-    
-    ${generateResponseSummary(report.chatGPTResponses)}
     
     <div class="section">
       ${report.chatGPTResponses.map((response, idx) => generateResponseCard(response, idx)).join('\n')}
@@ -415,24 +423,30 @@ function generateResponseSummary(responses: any[]): string {
   const topRankCount = mentionedResponses.filter(r => r.rank === 1).length;
 
   return `
-    <div class="stats-summary">
-      <div class="stat-item">
-        <div class="stat-value">${mentionPercentage}%</div>
-        <div class="stat-label">Mention Rate</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${mentionedCount}/${totalResponses}</div>
-        <div class="stat-label">Times Mentioned</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${avgRank !== null ? `#${avgRank}` : 'N/A'}</div>
-        <div class="stat-label">Avg Rank</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${topRankCount}</div>
-        <div class="stat-label">Top Rank (#1)</div>
-      </div>
-    </div>
+    <table class="stats-summary" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td class="stat-item">
+          <span class="stat-emoji">📊</span>
+          <div class="stat-value">${mentionPercentage}%</div>
+          <div class="stat-label">Mention Rate</div>
+        </td>
+        <td class="stat-item">
+          <span class="stat-emoji">✅</span>
+          <div class="stat-value">${mentionedCount}/${totalResponses}</div>
+          <div class="stat-label">Times Mentioned</div>
+        </td>
+        <td class="stat-item">
+          <span class="stat-emoji">🏆</span>
+          <div class="stat-value">${avgRank !== null ? `#${avgRank}` : 'N/A'}</div>
+          <div class="stat-label">Avg Rank</div>
+        </td>
+        <td class="stat-item">
+          <span class="stat-emoji">⭐</span>
+          <div class="stat-value">${topRankCount}</div>
+          <div class="stat-label">Top Rank (#1)</div>
+        </td>
+      </tr>
+    </table>
   `;
 }
 
