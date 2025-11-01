@@ -16,16 +16,22 @@ export class OpenAIService {
    * Generate customer prompts that people might use when asking ChatGPT
    */
   async generateCustomerPrompts(businessInfo: BusinessInfo): Promise<CustomerPrompt[]> {
-    const prompt = `Given the following business information, generate 7-10 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this business.
+    const prompt = `Given the following business information, generate 7-10 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this TYPE of business.
 
+Business Context (use this to understand what the business does):
 ${formatBusinessInfoForPrompt(businessInfo)}
 
+CRITICAL: DO NOT mention the business name "${businessInfo.businessName}" in any of the generated prompts. These should be generic queries that a potential customer would ask when looking for this TYPE of service/product.
+
 Generate prompts in different categories such as:
-- Finding/discovering this type of business
+- Finding/discovering this type of business or service
 - Comparing options in this industry
-- Specific product/service needs
-- Local recommendations
+- Specific product/service needs that this business addresses
+- Local recommendations (if location is relevant: ${businessInfo.location || 'general'})
 - Quality and reputation inquiries
+- Problem-solving queries related to what this business solves
+
+Use the business description, products/services, and target market to create realistic queries that would naturally lead to this business being recommended.
 
 Return the response as a JSON array with objects containing "category" and "prompt" fields.
 Example format:
