@@ -181,24 +181,20 @@ export class VisibilityReportAgent {
         visibilityAnalysis
       );
 
-      // Process all customer prompts with real web search sequentially to avoid rate limits
+      // Process all customer prompts with real web search in parallel for maximum speed
       console.log(
-        `Processing ${customerPrompts.length} prompts with web search (4 runs each)...`
+        `Processing ${customerPrompts.length} prompts with web search (4 runs each) - all in parallel...`
       );
-      const chatGPTResponses = [];
-      for (let i = 0; i < customerPrompts.length; i++) {
-        console.log(`\nPrompt ${i + 1}/${customerPrompts.length}:`);
-        const response = await this.openAIService.processCustomerPrompt(
-          customerPrompts[i].prompt,
-          businessInfo
-        );
-        chatGPTResponses.push(response);
-
-        // Small delay between prompts to avoid rate limits
-        if (i < customerPrompts.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
+      const chatGPTResponses = await Promise.all(
+        customerPrompts.map((customerPrompt, i) => {
+          console.log(`Starting prompt ${i + 1}/${customerPrompts.length}: "${customerPrompt.prompt.substring(0, 60)}..."`);
+          return this.openAIService.processCustomerPrompt(
+            customerPrompt.prompt,
+            businessInfo
+          );
+        })
+      );
+      console.log('\n✓ All prompts processed');
 
       // Create report
       const report: Report = {

@@ -445,10 +445,10 @@ export function generateHTMLReport(report: Report): string {
         ? `
     ${generateSourceMentionsChart(report.chatGPTResponses, report.businessName)}
     ${generateSourceDomainPieChart(report.chatGPTResponses)}
-    
+
     <h2>🎯 ChatGPT Response Analysis</h2>
     <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
-    
+
     <div class="section">
       ${report.chatGPTResponses
         .map((response, idx) => generateResponseCard(response, idx))
@@ -457,51 +457,6 @@ export function generateHTMLReport(report: Report): string {
     `
         : ""
     }
-
-    <h2>🔍 Visibility Analysis</h2>
-    <div class="section">
-      <p><strong>Overall Assessment:</strong></p>
-      <div class="assessment ${visibilityClass}">
-        ${report.visibilityAnalysis.overallAssessment} Visibility
-      </div>
-
-      <h3>Key Factors</h3>
-      <ul>
-        ${report.visibilityAnalysis.keyFactors
-          .map((f) => `<li>${escapeHTML(f)}</li>`)
-          .join("\n")}
-      </ul>
-
-      <h3>Current Strengths</h3>
-      <ul>
-        ${report.visibilityAnalysis.strengths
-          .map((s) => `<li>${escapeHTML(s)}</li>`)
-          .join("\n")}
-      </ul>
-
-      <h3>Opportunities for Improvement</h3>
-      <ul>
-        ${report.visibilityAnalysis.opportunities
-          .map((o) => `<li>${escapeHTML(o)}</li>`)
-          .join("\n")}
-      </ul>
-    </div>
-
-    <h2>💡 Recommendations</h2>
-    <p>Actionable steps to improve your visibility in AI assistant conversations:</p>
-    ${report.recommendations
-      .map(
-        (rec, idx) => `
-      <div class="recommendation">
-        <h3>
-          ${idx + 1}. ${escapeHTML(rec.title)}
-          <span class="priority-badge">Priority ${rec.priority}</span>
-        </h3>
-        <p>${escapeHTML(rec.description)}</p>
-      </div>
-    `
-      )
-      .join("\n")}
 
     <div class="footer">
       <p><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary based on many factors including content quality, user queries, and AI model training data.</p>
@@ -584,46 +539,19 @@ ${"-".repeat(60)}
       }
 
       if (response.sources && response.sources.length > 0) {
-        text += `   Sources (across all runs):\n`;
-        response.sources.forEach((source: string) => {
+        const topSources = response.sources.slice(0, 5);
+        const remainingCount = response.sources.length - 5;
+        text += `   Top Sources:\n`;
+        topSources.forEach((source: string) => {
           text += `     • ${source}\n`;
         });
+        if (remainingCount > 0) {
+          text += `     + ${remainingCount} more source${remainingCount > 1 ? 's' : ''}\n`;
+        }
       }
       text += "\n";
     });
   }
-
-  text += `
-VISIBILITY ANALYSIS
-${"-".repeat(60)}
-
-Overall Assessment: ${report.visibilityAnalysis.overallAssessment} Visibility
-
-Key Factors:
-${report.visibilityAnalysis.keyFactors.map((f) => `  • ${f}`).join("\n")}
-
-Current Strengths:
-${report.visibilityAnalysis.strengths.map((s) => `  • ${s}`).join("\n")}
-
-Opportunities for Improvement:
-${report.visibilityAnalysis.opportunities.map((o) => `  • ${o}`).join("\n")}
-
-`;
-
-  text += `
-RECOMMENDATIONS
-${"-".repeat(60)}
-
-Actionable steps to improve your visibility in AI assistant conversations:
-
-`;
-
-  report.recommendations.forEach((rec, idx) => {
-    text += `${idx + 1}. ${rec.title} (Priority ${rec.priority})
-${rec.description}
-
-`;
-  });
 
   text += `
 ${"-".repeat(60)}
@@ -932,10 +860,13 @@ function generateResponseCard(response: any, index: number): string {
 
   let sourcesHTML = "";
   if (response.sources && response.sources.length > 0) {
+    const topSources = response.sources.slice(0, 5);
+    const remainingCount = response.sources.length - 5;
+
     sourcesHTML = `
       <div class="sources">
-        <div class="sources-label">All Sources Used (Across All Runs):</div>
-        ${response.sources
+        <div class="sources-label">Top Sources Used:</div>
+        ${topSources
           .map(
             (source: string) =>
               `<a href="${escapeHTML(
@@ -943,6 +874,7 @@ function generateResponseCard(response: any, index: number): string {
               )}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
           )
           .join("")}
+        ${remainingCount > 0 ? `<div style="color: #666; font-size: 12px; margin-top: 8px;">+ ${remainingCount} more source${remainingCount > 1 ? 's' : ''}</div>` : ''}
       </div>
     `;
   }

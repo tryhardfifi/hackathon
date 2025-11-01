@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+.dev-config.json
 *.log
 logs/
 reports/

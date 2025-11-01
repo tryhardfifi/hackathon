@@ -6,6 +6,7 @@ import { BrowserUseService } from './services/browserUse';
 import { AgentMailService } from './services/agentmail';
 import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
 import { saveDebugLog, saveDebugLogText } from './utils/debugLogger';
+import { loadDevConfig, saveDevConfig, formatPromptWithDefault } from './utils/devConfig';
 import { Report } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -34,16 +35,26 @@ async function main() {
     process.exit(1);
   }
 
+  // Load saved config
+  const savedConfig = loadDevConfig();
+
   // Ask for mode
   console.log('Choose extraction mode:');
   console.log('1. Fast Mode (GPT only - faster)');
-  console.log('2. Browser Use (More accurate but slower)\n');
+  console.log('2. Browser Use (More accurate but slower)');
+  if (savedConfig.lastMode) {
+    const modeName = savedConfig.lastMode === '1' ? 'Fast Mode' : 'Browser Use';
+    console.log(`\n(Last used: ${modeName})`);
+  }
+  console.log();
 
-  const mode = await question('Enter mode (1 or 2): ');
-  const useBrowserUse = mode.trim() === '2';
+  const modeInput = await question(formatPromptWithDefault('Enter mode (1 or 2)', savedConfig.lastMode));
+  const mode = modeInput.trim() || savedConfig.lastMode || '1';
+  const useBrowserUse = mode === '2';
 
   // Ask for URL
-  const url = await question('\nEnter the business website URL: ');
+  const urlInput = await question(formatPromptWithDefault('\nEnter the business website URL', savedConfig.lastUrl));
+  const url = urlInput.trim() || savedConfig.lastUrl || '';
 
   if (!url || !url.startsWith('http')) {
     console.error('❌ Invalid URL provided');
@@ -52,7 +63,8 @@ async function main() {
   }
 
   // Ask for email (optional)
-  const email = await question('\nEnter email to send report to (or press Enter to skip): ');
+  const emailInput = await question(formatPromptWithDefault('\nEnter email to send report to (or press Enter to skip)', savedConfig.lastEmail));
+  const email = emailInput.trim() || savedConfig.lastEmail || '';
   const sendEmail = email && email.includes('@');
 
   if (sendEmail) {
@@ -60,6 +72,13 @@ async function main() {
   } else {
     console.log('   Report will only be saved to files');
   }
+
+  // Save config for next time
+  saveDevConfig({
+    lastMode: mode as '1' | '2',
+    lastUrl: url,
+    lastEmail: email || undefined,
+  });
 
   console.log(`\n📊 Generating visibility report for: ${url}`);
   console.log(`   Using: ${useBrowserUse ? 'Browser Use' : 'GPT Fast Mode'}\n`);
@@ -135,22 +154,18 @@ async function main() {
     const recommendations = await openAIService.generateRecommendations(businessInfo, visibilityAnalysis);
     console.log('✓ Recommendations created\n');
 
-    // Process all customer prompts with real web search
-    console.log(`Processing ${customerPrompts.length} prompts with web search (4 runs each)...\n`);
-    const chatGPTResponses = [];
-    for (let i = 0; i < customerPrompts.length; i++) {
-      console.log(`Prompt ${i + 1}/${customerPrompts.length}:`);
-      const response = await openAIService.processCustomerPrompt(
-        customerPrompts[i].prompt,
-        businessInfo
-      );
-      chatGPTResponses.push(response);
-
-      // Small delay between prompts
-      if (i < customerPrompts.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+    // Process all customer prompts with real web search in parallel for maximum speed
+    console.log(`Processing ${customerPrompts.length} prompts with web search (4 runs each) - all in parallel...\n`);
+    const chatGPTResponses = await Promise.all(
+      customerPrompts.map((customerPrompt, i) => {
+        console.log(`Starting prompt ${i + 1}/${customerPrompts.length}: "${customerPrompt.prompt.substring(0, 60)}..."`);
+        return openAIService.processCustomerPrompt(
+          customerPrompt.prompt,
+          businessInfo
+        );
+      })
+    );
+    console.log('\n✓ All prompts processed');
 
     // Create report
     const report: Report = {
