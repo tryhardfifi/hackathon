@@ -290,10 +290,6 @@ Task: Determine if this business was mentioned in the response, and if so, what 
 Return a JSON object with:
 - businessMentioned (boolean): true if the business was explicitly mentioned or recommended
 - rank (number or null): If mentioned, the position in the list (1 for first, 2 for second, etc.). null if not mentioned or not in a ranked list.
-- relevantSources (array of strings): Only the sources from the list below that are directly related to this business (empty array if none)
-
-Available sources to choose from:
-${sources.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Only return the JSON object, no additional text.`;
 
@@ -321,7 +317,7 @@ Only return the JSON object, no additional text.`;
         prompt,
         businessMentioned: parsed.businessMentioned || false,
         rank: parsed.rank || null,
-        sources: parsed.relevantSources || sources.slice(0, 3), // Fallback to first 3 sources
+        sources: sources, // Include ALL sources from web search
       };
     } catch (error) {
       console.error('Failed to analyze web search results:', error);
@@ -329,7 +325,7 @@ Only return the JSON object, no additional text.`;
         prompt,
         businessMentioned: false,
         rank: null,
-        sources: sources.slice(0, 3),
+        sources: sources, // Include ALL sources even on error
       };
     }
   }

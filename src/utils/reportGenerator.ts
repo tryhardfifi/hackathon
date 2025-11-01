@@ -672,79 +672,23 @@ function generateSourceMentionsChart(
     }
   });
 
-  // Extract business domain from sources (look for patterns like /blog/, /guide/, /about/)
-  // Business sources typically have paths like /blog/..., /guide/..., etc.
-  let businessDomains: string[] = [];
-  const allSources = Object.keys(sourceCounts);
-
-  // Find potential business domains by looking for sources with blog/guide/about paths
-  allSources.forEach((source) => {
-    if (
-      source.includes("/blog/") ||
-      source.includes("/guide/") ||
-      source.includes("/about/") ||
-      source.includes("/resources/")
-    ) {
-      try {
-        const url = new URL(source);
-        if (!businessDomains.includes(url.hostname)) {
-          businessDomains.push(url.hostname);
-        }
-      } catch (e) {
-        const match = source.match(/https?:\/\/([^\/]+)/);
-        if (match && !businessDomains.includes(match[1])) {
-          businessDomains.push(match[1]);
-        }
-      }
-    }
-  });
-
-  // Filter to only business sources (those with business domain or blog/guide paths)
-  const businessSources = Object.entries(sourceCounts)
-    .filter(([source]) => {
-      // Check if source has business-like paths
-      if (
-        source.includes("/blog/") ||
-        source.includes("/guide/") ||
-        source.includes("/about/") ||
-        source.includes("/resources/")
-      ) {
-        // Make sure it's not a common third-party domain
-        const commonDomains = [
-          "youtube.com",
-          "facebook.com",
-          "twitter.com",
-          "instagram.com",
-          "linkedin.com",
-          "reddit.com",
-          "medium.com",
-          "wikipedia.org",
-          "amazon.com",
-        ];
-        try {
-          const url = new URL(source);
-          return !commonDomains.some((domain) => url.hostname.includes(domain));
-        } catch (e) {
-          return true; // If we can't parse, include it if it has business-like paths
-        }
-      }
-      return false;
-    })
+  // Get all sources sorted by count
+  const allSources = Object.entries(sourceCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10); // Top 10 sources
+    .slice(0, 15); // Top 15 sources
 
-  if (businessSources.length === 0) {
+  if (allSources.length === 0) {
     return `
     <div class="source-chart">
       <h2>📈 Top Mentioned Sources</h2>
-      <div class="source-chart-empty">No business sources found in ChatGPT responses</div>
+      <div class="source-chart-empty">No sources found in ChatGPT responses</div>
     </div>
     `;
   }
 
-  const maxCount = businessSources[0][1];
+  const maxCount = allSources[0][1];
 
-  const chartRows = businessSources
+  const chartRows = allSources
     .map(([source, count]) => {
       // Calculate percentage based on the maximum count (so bars are proportional)
       const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
@@ -777,7 +721,7 @@ function generateSourceMentionsChart(
   return `
     <div class="source-chart">
       <h2>📈 Top Mentioned Sources</h2>
-      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Your most referenced content in ChatGPT responses:</p>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Most referenced sources in ChatGPT responses:</p>
       ${chartRows}
     </div>
   `;
