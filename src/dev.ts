@@ -3,6 +3,7 @@ import { validateConfig } from './config';
 import { OpenAIService } from './services/openai';
 import { GPTBusinessExtractor } from './services/gptBusinessExtractor';
 import { BrowserUseService } from './services/browserUse';
+import { AgentMailService } from './services/agentmail';
 import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
 import { saveDebugLog, saveDebugLogText } from './utils/debugLogger';
 import { Report } from './types';
@@ -48,6 +49,16 @@ async function main() {
     console.error('❌ Invalid URL provided');
     rl.close();
     process.exit(1);
+  }
+
+  // Ask for email (optional)
+  const email = await question('\nEnter email to send report to (or press Enter to skip): ');
+  const sendEmail = email && email.includes('@');
+
+  if (sendEmail) {
+    console.log(`   Will send report to: ${email}`);
+  } else {
+    console.log('   Report will only be saved to files');
   }
 
   console.log(`\n📊 Generating visibility report for: ${url}`);
@@ -188,6 +199,24 @@ async function main() {
       saveDebugLogText(report, businessInfo);
     } catch (error) {
       console.error('Failed to save debug logs (non-fatal):', error);
+    }
+
+    // Send email if requested
+    if (sendEmail) {
+      console.log(`\n📧 Sending report to ${email}...`);
+      try {
+        const agentMailService = new AgentMailService();
+        await agentMailService.sendEmail(
+          email,
+          `GPT Visibility Report - ${businessInfo.businessName}`,
+          htmlReport,
+          textReport
+        );
+        console.log('✓ Email sent successfully!');
+      } catch (error) {
+        console.error('❌ Failed to send email:', error);
+        console.log('   The report has been saved to files instead.');
+      }
     }
 
     console.log('\n✅ Report generation complete!\n');
