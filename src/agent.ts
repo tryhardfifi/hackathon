@@ -1,6 +1,7 @@
 import { AgentMailService } from './services/agentmail';
 import { AgentMailWebSocketService, WebSocketEvent } from './services/websocket';
 import { OpenAIService } from './services/openai';
+import { BrowserUseService } from './services/browserUse';
 import { parseBusinessInfo } from './utils/emailParser';
 import { generateHTMLReport, generateTextReport } from './utils/reportGenerator';
 import { Report } from './types';
@@ -9,12 +10,14 @@ export class VisibilityReportAgent {
   private agentMailService: AgentMailService;
   private websocketService: AgentMailWebSocketService;
   private openAIService: OpenAIService;
+  private browserUseService: BrowserUseService;
   private processingMessages: Set<string> = new Set();
 
   constructor() {
     this.agentMailService = new AgentMailService();
     this.websocketService = new AgentMailWebSocketService();
     this.openAIService = new OpenAIService();
+    this.browserUseService = new BrowserUseService();
   }
 
   /**
@@ -48,18 +51,52 @@ export class VisibilityReportAgent {
         return false;
       }
 
-      // Parse business information from email using OpenAI
+      // Extract URL from email
       const emailBody = this.agentMailService.getMessageText(message);
-      console.log('Parsing business info with OpenAI...');
-      const businessInfo = await parseBusinessInfo(emailBody);
+      console.log('Extracting URL from email...');
+      const emailData = await parseBusinessInfo(emailBody);
 
-      if (!businessInfo) {
-        console.log('Failed to parse business information, sending error response');
+      if (!emailData || !emailData.url) {
+        console.log('No URL found in email, sending error response');
         const fromEmail = this.agentMailService.getMessageFrom(message);
         await this.sendErrorResponse(messageId, fromEmail, emailBody);
         this.processingMessages.delete(messageId);
         return false;
       }
+
+      const url = emailData.url;
+      const businessNameHint = emailData.businessName !== 'Unknown' ? emailData.businessName : undefined;
+
+      console.log(`📊 URL found: ${url}`);
+      console.log(`🌐 Using Browser Use to extract ALL business information from website...`);
+
+      // Use Browser Use to extract ALL business information
+      const websiteExtraction = await this.browserUseService.extractBusinessInfo(
+        url,
+        businessNameHint || 'the business'
+      );
+
+      if (!websiteExtraction.success || !websiteExtraction.data) {
+        console.log('⚠️  Could not extract information from website:', websiteExtraction.error);
+        const fromEmail = this.agentMailService.getMessageFrom(message);
+        await this.sendErrorResponse(messageId, fromEmail, emailBody);
+        this.processingMessages.delete(messageId);
+        return false;
+      }
+
+      console.log('✓ Website information extracted successfully');
+
+      // Build business info from Browser Use extraction
+      const businessInfo = {
+        businessName: businessNameHint || websiteExtraction.data.businessDescription?.split(' ')[0] || 'Unknown Business',
+        industry: 'Technology / Software', // Will be inferred by OpenAI in the report
+        productsServices: websiteExtraction.data.businessDescription || '',
+        targetCustomers: websiteExtraction.data.targetMarket || '',
+        location: websiteExtraction.data.location || '',
+        website: url,
+        url: url,
+        additionalContext: websiteExtraction.data.additionalInfo || '',
+      };
 
       console.log(`Processing report for: ${businessInfo.businessName}`);
 

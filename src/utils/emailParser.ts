@@ -5,20 +5,15 @@ import { BusinessInfo } from '../types';
 const openai = new OpenAI({ apiKey: config.openai.apiKey });
 
 /**
- * Parse email body to extract business information using OpenAI
+ * Parse email body to extract URL using OpenAI
  */
-export async function parseBusinessInfo(emailBody: string): Promise<BusinessInfo | null> {
+export async function parseEmailForURL(emailBody: string): Promise<{ url: string; businessName?: string } | null> {
   try {
-    const prompt = `Extract business information from this email. Return a JSON object with these fields:
-- businessName (required): The name of the business/company
-- industry (required): The industry or sector
-- productsServices: What products or services they offer
-- targetCustomers: Who their target customers are
-- location: Geographic location
-- website: Website URL if mentioned
-- additionalContext: Any other relevant details
+    const prompt = `Extract the URL from this email. Return a JSON object with:
+- url: The website URL mentioned in the email (add https:// if not present)
+- businessName: The business name if explicitly mentioned (optional)
 
-If the email doesn't contain enough information to identify a business name and industry, return null.
+IMPORTANT: Just extract the URL from the email. We'll use it to visit the website and get all the business information from there.
 
 Email content:
 ${emailBody}
@@ -30,7 +25,7 @@ Return ONLY valid JSON, no other text.`;
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant that extracts structured business information from emails. Always return valid JSON or the word "null" if information is insufficient.',
+          content: 'You extract URLs from emails. Always return valid JSON.',
         },
         {
           role: 'user',
@@ -46,30 +41,52 @@ Return ONLY valid JSON, no other text.`;
     try {
       const parsed = JSON.parse(content);
 
-      // Validate required fields
-      if (!parsed.businessName || !parsed.industry) {
-        console.log('OpenAI could not extract required fields (businessName, industry)');
+      if (!parsed.url) {
+        console.log('No URL found in email');
         return null;
       }
 
-      // Return structured business info
+      // Ensure URL has protocol
+      let url = parsed.url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+
       return {
+        url,
         businessName: parsed.businessName,
-        industry: parsed.industry,
-        productsServices: parsed.productsServices || '',
-        targetCustomers: parsed.targetCustomers || '',
-        location: parsed.location || '',
-        website: parsed.website,
-        additionalContext: parsed.additionalContext,
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       return null;
     }
   } catch (error) {
-    console.error('Error parsing business info with OpenAI:', error);
+    console.error('Error parsing email with OpenAI:', error);
     return null;
   }
+}
+
+/**
+ * Legacy function - kept for compatibility but now just extracts URL
+ */
+export async function parseBusinessInfo(emailBody: string): Promise<(BusinessInfo & { url?: string }) | null> {
+  const result = await parseEmailForURL(emailBody);
+
+  if (!result) {
+    return null;
+  }
+
+  // Return minimal info - Browser Use will fill in the rest
+  return {
+    businessName: result.businessName || 'Unknown',
+    industry: 'Will be extracted from website',
+    productsServices: '',
+    targetCustomers: '',
+    location: '',
+    website: result.url,
+    url: result.url,
+    additionalContext: '',
+  };
 }
 
 /**
