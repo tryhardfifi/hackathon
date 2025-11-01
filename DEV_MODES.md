@@ -8,12 +8,13 @@ This project now supports multiple development modes for testing and running the
 **Fastest option for testing!**
 
 This runs an interactive CLI that lets you:
-1. Enter a business website URL directly
-2. Choose between two extraction modes:
+1. Choose between two extraction modes:
    - **Fast Mode (GPT)**: Uses GPT with web search to extract business info (faster)
    - **Browser Use Mode**: Uses Browser Use SDK for more accurate extraction (slower but more thorough)
+2. Enter a business website URL directly
+3. **Optionally enter an email address** to send the report to (or skip to only save files)
 
-The report is generated and saved to the `reports/` directory as HTML and text files.
+The report is generated and saved to the `reports/` directory as HTML and text files. If you provide an email, it will also be sent via AgentMail.
 
 **Usage:**
 ```bash
@@ -23,6 +24,7 @@ npm run dev
 Then follow the prompts:
 - Choose mode (1 for Fast, 2 for Browser Use)
 - Enter the business URL (e.g., https://fits-app.com)
+- Enter email address (optional - press Enter to skip)
 - Wait for the report to generate
 
 **Output:**
@@ -67,10 +69,10 @@ npm run start
 | Feature | `npm run dev` | `npm run dev-agent` |
 |---------|--------------|-------------------|
 | Speed | ⚡ Fast | 🐌 Slower |
-| Email handling | ❌ No | ✅ Yes |
+| Email sending | ✅ Optional (prompted) | ✅ Yes (automatic) |
 | URL input | 🖊️ Manual | 📧 From email |
 | Business extraction | Choice: GPT or Browser Use | Browser Use only |
-| Report delivery | 💾 Saved to files | 📧 Sent via email |
+| Report delivery | 💾 Files + Optional email | 📧 Email only |
 | Best for | Quick testing & iteration | Full integration testing |
 
 ---

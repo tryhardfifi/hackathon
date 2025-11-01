@@ -229,36 +229,22 @@ Only return the JSON array, no additional text.`;
       let text = '';
       let sources: string[] = [];
 
-      // Debug: Log full response to understand structure
-      console.log(`      [DEBUG] Full response:`, JSON.stringify(response, null, 2).substring(0, 2000));
-
-      // Debug: Log response structure
-      console.log(`      [DEBUG] Response output items: ${(response.output as any[]).length}`);
-
       // Extract text and annotations from message items
       for (const item of response.output as any[]) {
-        console.log(`      [DEBUG] Item type: ${item.type}`);
-
         if (item.type === 'message' && item.content) {
           for (const contentItem of item.content) {
             if (contentItem.type === 'output_text') {
               text = contentItem.text;
-              console.log(`      [DEBUG] Found text, length: ${text.length}`);
 
               // Extract sources from annotations
               if (contentItem.annotations) {
-                console.log(`      [DEBUG] Annotations found: ${contentItem.annotations.length}`);
                 for (const annotation of contentItem.annotations) {
-                  console.log(`      [DEBUG] Annotation type: ${annotation.type}`);
                   if (annotation.type === 'url_citation' && annotation.url) {
                     if (!sources.includes(annotation.url)) {
                       sources.push(annotation.url);
-                      console.log(`      [DEBUG] Added source from annotation: ${annotation.url}`);
                     }
                   }
                 }
-              } else {
-                console.log(`      [DEBUG] No annotations in output_text`);
               }
             }
           }
@@ -266,23 +252,15 @@ Only return the JSON array, no additional text.`;
 
         // Also extract from web_search_call sources if available
         if (item.type === 'web_search_call') {
-          console.log(`      [DEBUG] Found web_search_call`);
           if (item.action?.sources) {
-            console.log(`      [DEBUG] web_search_call has ${item.action.sources.length} sources`);
             for (const source of item.action.sources) {
               if (source.url && !sources.includes(source.url)) {
                 sources.push(source.url);
-                console.log(`      [DEBUG] Added source from web_search_call: ${source.url}`);
               }
             }
-          } else {
-            console.log(`      [DEBUG] web_search_call has no action.sources`);
-            console.log(`      [DEBUG] web_search_call structure:`, JSON.stringify(item, null, 2));
           }
         }
       }
-
-      console.log(`      [DEBUG] Final - Text length: ${text.length}, Sources count: ${sources.length}`);
 
       return { text, sources };
     } catch (error) {
@@ -370,55 +348,53 @@ Only return the JSON object, no additional text.`;
     businessInfo: BusinessInfo,
     numRuns: number = 4
   ): Promise<ChatGPTResponse> {
-    console.log(`  Running web search for: "${prompt.substring(0, 60)}..." (${numRuns} times)`);
+    console.log(`  Running web search for: "${prompt.substring(0, 60)}..." (${numRuns} times in parallel)`);
 
-    const runs: SingleRunResult[] = [];
     const allSources = new Set<string>();
 
-    // Run the prompt multiple times
-    for (let i = 0; i < numRuns; i++) {
-      console.log(`    Run ${i + 1}/${numRuns}...`);
+    // Run all searches in parallel
+    const runPromises = Array.from({ length: numRuns }, async (_, i) => {
+      const runNumber = i + 1;
+      console.log(`    Starting run ${runNumber}/${numRuns}...`);
 
-      // Run web search
-      const { text, sources } = await this.runWebSearchQuery(prompt);
+      try {
+        // Run web search
+        const { text, sources } = await this.runWebSearchQuery(prompt);
 
-      if (!text) {
-        console.log(`      No results from web search on run ${i + 1}`);
-        runs.push({
+        if (!text) {
+          console.log(`      Run ${runNumber}: No results from web search`);
+          return {
+            businessMentioned: false,
+            rank: null,
+            sources: [],
+          };
+        }
+
+        console.log(`      Run ${runNumber}: Found ${sources.length} sources`);
+
+        // Analyze the results
+        const analysis = await this.analyzeWebSearchResults(prompt, text, businessInfo, sources);
+
+        console.log(`      Run ${runNumber}: ${analysis.businessMentioned ? `Mentioned (rank ${analysis.rank})` : 'Not mentioned'}`);
+
+        return analysis;
+      } catch (error) {
+        console.error(`      Run ${runNumber}: Error occurred`, error);
+        return {
           businessMentioned: false,
           rank: null,
           sources: [],
-        });
-
-        // Small delay even on failure before next run
-        if (i < numRuns - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        continue;
+        };
       }
+    });
 
-      console.log(`      Found ${sources.length} sources`);
+    // Wait for all runs to complete
+    const runs = await Promise.all(runPromises);
 
-      // Analyze the results
-      const analysis = await this.analyzeWebSearchResults(prompt, text, businessInfo, sources);
-
-      // Store this run's result
-      runs.push({
-        businessMentioned: analysis.businessMentioned,
-        rank: analysis.rank,
-        sources: analysis.sources,
-      });
-
-      // Collect all unique sources
-      analysis.sources.forEach(source => allSources.add(source));
-
-      console.log(`      Analysis: ${analysis.businessMentioned ? `Mentioned (rank ${analysis.rank})` : 'Not mentioned'}`);
-
-      // Add delay between runs to avoid rate limits
-      if (i < numRuns - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-    }
+    // Collect all unique sources
+    runs.forEach(run => {
+      run.sources.forEach(source => allSources.add(source));
+    });
 
     // Calculate statistics
     const mentionCount = runs.filter(run => run.businessMentioned).length;
