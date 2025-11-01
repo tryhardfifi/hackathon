@@ -30,7 +30,10 @@ export class VisibilityReportAgent {
   /**
    * Get message with retry logic to handle race conditions
    */
-  private async getMessageWithRetry(messageId: string, maxRetries: number): Promise<any> {
+  private async getMessageWithRetry(
+    messageId: string,
+    maxRetries: number
+  ): Promise<any> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -38,12 +41,12 @@ export class VisibilityReportAgent {
         // Wait before attempting
         if (attempt === 1) {
           // Small initial delay to let the API index the message
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         } else {
           // Exponential backoff for retries
           const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
           console.log(`  Retry ${attempt}/${maxRetries} after ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
 
         const message = await this.agentMailService.getMessage(messageId);
@@ -53,7 +56,9 @@ export class VisibilityReportAgent {
 
         // If it's a 404, the message might not be indexed yet - retry
         if (error.statusCode === 404 && attempt < maxRetries) {
-          console.log(`  Message not found yet (attempt ${attempt}/${maxRetries}), will retry...`);
+          console.log(
+            `  Message not found yet (attempt ${attempt}/${maxRetries}), will retry...`
+          );
           continue;
         }
 
@@ -62,7 +67,7 @@ export class VisibilityReportAgent {
       }
     }
 
-    throw lastError || new Error('Failed to get message after retries');
+    throw lastError || new Error("Failed to get message after retries");
   }
 
   /**
@@ -150,11 +155,11 @@ export class VisibilityReportAgent {
           "Unknown Business",
         industry: "Technology / Software", // Will be inferred by OpenAI in the report
         productsServices: websiteExtraction.data.businessDescription || "",
-        targetCustomers: websiteExtraction.data.targetMarket || "",
+        targetCustomers: websiteExtraction.data.targetMarkets?.join(", ") || "",
         location: websiteExtraction.data.location || "",
         website: url,
         url: url,
-        additionalContext: websiteExtraction.data.additionalInfo || "",
+        additionalContext: "", // No longer storing additionalInfo
       };
 
       console.log(`Processing report for: ${businessInfo.businessName}`);
@@ -177,7 +182,9 @@ export class VisibilityReportAgent {
       );
 
       // Process all customer prompts with real web search sequentially to avoid rate limits
-      console.log(`Processing ${customerPrompts.length} prompts with web search (4 runs each)...`);
+      console.log(
+        `Processing ${customerPrompts.length} prompts with web search (4 runs each)...`
+      );
       const chatGPTResponses = [];
       for (let i = 0; i < customerPrompts.length; i++) {
         console.log(`\nPrompt ${i + 1}/${customerPrompts.length}:`);
@@ -189,7 +196,7 @@ export class VisibilityReportAgent {
 
         // Small delay between prompts to avoid rate limits
         if (i < customerPrompts.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
