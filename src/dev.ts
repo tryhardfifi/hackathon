@@ -86,11 +86,11 @@ async function main() {
         businessName: websiteExtraction.data.businessDescription?.split(' ')[0] || 'Unknown Business',
         industry: 'Technology / Software',
         productsServices: websiteExtraction.data.businessDescription || '',
-        targetCustomers: websiteExtraction.data.targetMarket || '',
+        targetCustomers: websiteExtraction.data.targetMarkets?.join(", ") || '',
         location: websiteExtraction.data.location || '',
         website: url,
         url: url,
-        additionalContext: websiteExtraction.data.additionalInfo || '',
+        additionalContext: '',
       };
     } else {
       // Use GPT for extraction (faster)
