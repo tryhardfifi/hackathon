@@ -521,6 +521,263 @@ Write ONLY the comment text - no quotes, no explanations, nothing extra. Just th
   }
 
   /**
+   * Extract business information from a website URL using web search
+   */
+  async extractBusinessInfoFromUrl(
+    url: string,
+    businessNameHint?: string
+  ): Promise<{
+    success: boolean;
+    data?: {
+      businessName: string;
+      businessDescription: string;
+      products: string[];
+      services: string[];
+      targetMarkets: string[];
+      keyFeatures: string[];
+      location: string;
+    };
+    error?: string;
+  }> {
+    try {
+      console.log(`🌐 Extracting business info from ${url} using web search...`);
+
+      // Use web search to get information about the website
+      const searchQuery = `${url} business information products services target customers`;
+      const searchResult = await this.runWebSearchQuery(searchQuery);
+
+      if (!searchResult.text) {
+        console.log(`  Could not fetch information from web search`);
+        return {
+          success: false,
+          error: 'Could not fetch information via web search',
+        };
+      }
+
+      console.log(`  Fetched content (${searchResult.text.length} chars)`);
+
+      // Use OpenAI to extract structured business information
+      const extractionPrompt = `Analyze the following information about the website ${url} and extract structured business information.
+
+Website Content:
+${searchResult.text}
+
+Extract the following information:
+1. Business Name: The name of the company/business
+2. Business Description: A comprehensive description of what the business does
+3. Products: List of main products they offer (as an array of strings)
+4. Services: List of main services they provide (as an array of strings)
+5. Target Markets: Who their target customers/audience are (as an array of strings)
+6. Key Features: Main features or differentiators that make them unique (as an array of strings)
+7. Location: Physical location or areas they serve
+
+Return a JSON object with these fields:
+{
+  "businessName": "string",
+  "businessDescription": "string",
+  "products": ["string"],
+  "services": ["string"],
+  "targetMarkets": ["string"],
+  "keyFeatures": ["string"],
+  "location": "string"
+}
+
+If any information is not available, use empty strings or empty arrays.
+
+Only return the JSON object, no additional text.`;
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You extract structured business information from website content. Be thorough and accurate.',
+          },
+          {
+            role: 'user',
+            content: extractionPrompt,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      });
+
+      const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+
+      if (!parsed.businessName && !parsed.businessDescription) {
+        console.log(`  Could not extract business information`);
+        return {
+          success: false,
+          error: 'Could not extract business information from content',
+        };
+      }
+
+      // Use hint if business name is missing or generic
+      if (businessNameHint && (!parsed.businessName || parsed.businessName === 'Unknown' || parsed.businessName.length < 3)) {
+        parsed.businessName = businessNameHint;
+      }
+
+      console.log(`✓ Extracted business info successfully`);
+      console.log(`  Business Name: ${parsed.businessName}`);
+      console.log(`  Description: ${parsed.businessDescription.substring(0, 100)}...`);
+      console.log(`  Products: ${parsed.products?.length || 0}`);
+      console.log(`  Services: ${parsed.services?.length || 0}`);
+      console.log(`  Target Markets: ${parsed.targetMarkets?.length || 0}`);
+      console.log(`  Key Features: ${parsed.keyFeatures?.length || 0}`);
+      console.log(`  Location: ${parsed.location}`);
+
+      return {
+        success: true,
+        data: {
+          businessName: parsed.businessName || businessNameHint || 'Unknown Business',
+          businessDescription: parsed.businessDescription || '',
+          products: Array.isArray(parsed.products) ? parsed.products : [],
+          services: Array.isArray(parsed.services) ? parsed.services : [],
+          targetMarkets: Array.isArray(parsed.targetMarkets) ? parsed.targetMarkets : [],
+          keyFeatures: Array.isArray(parsed.keyFeatures) ? parsed.keyFeatures : [],
+          location: parsed.location || '',
+        },
+      };
+
+    } catch (error) {
+      console.error('Error extracting business info via web search:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to extract business information',
+      };
+    }
+  }
+
+  /**
+   * Search for Reddit posts relevant to the business using web search
+   * and generate comment suggestions (no Browser Use required)
+   */
+  async searchAndAnalyzeRedditPosts(
+    businessInfo: BusinessInfo,
+    maxPosts: number = 3
+  ): Promise<{
+    url: string;
+    title: string;
+    suggestedComment: string;
+  }[]> {
+    try {
+      console.log(`\n🔍 Searching for relevant Reddit posts about ${businessInfo.industry}...`);
+
+      // Construct a search query to find Reddit posts
+      const searchQuery = `site:reddit.com ${businessInfo.industry} ${businessInfo.productsServices.substring(0, 100)} recommendations`;
+
+      console.log(`  Search query: ${searchQuery}`);
+
+      // Perform web search to find Reddit posts
+      const searchResult = await this.runWebSearchQuery(searchQuery);
+
+      if (!searchResult.text || searchResult.sources.length === 0) {
+        console.log(`  No Reddit posts found in search results`);
+        return [];
+      }
+
+      console.log(`  Found ${searchResult.sources.length} sources from web search`);
+
+      // Filter for Reddit URLs
+      const redditUrls = searchResult.sources
+        .filter(url => url.includes('reddit.com/r/') && (url.includes('/comments/') || url.includes('/r/')))
+        .slice(0, maxPosts);
+
+      console.log(`  Filtered to ${redditUrls.length} Reddit URLs`);
+
+      if (redditUrls.length === 0) {
+        console.log(`  No valid Reddit post URLs found`);
+        return [];
+      }
+
+      // For each Reddit URL, fetch its content and generate a comment
+      const suggestions = [];
+
+      for (const url of redditUrls) {
+        try {
+          console.log(`\n  Processing Reddit URL: ${url}`);
+
+          // Use web search to get the content of this specific Reddit post
+          const postQuery = `${url} post content`;
+          const postResult = await this.runWebSearchQuery(postQuery);
+
+          if (!postResult.text) {
+            console.log(`    Could not fetch post content`);
+            continue;
+          }
+
+          console.log(`    Fetched post content (${postResult.text.length} chars)`);
+
+          // Use OpenAI to extract the title and content, then generate a comment
+          const analysisPrompt = `Analyze this Reddit post and extract the title and main post content (not comments).
+
+Reddit Post Data:
+${postResult.text}
+
+Return a JSON object with:
+- title: The post title
+- content: The main post content/body
+
+Only return the JSON object, no additional text.`;
+
+          const analysisResponse = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You extract structured data from Reddit posts.',
+              },
+              {
+                role: 'user',
+                content: analysisPrompt,
+              },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3,
+          });
+
+          const parsed = JSON.parse(analysisResponse.choices[0]?.message?.content || '{}');
+
+          if (!parsed.title || !parsed.content) {
+            console.log(`    Could not extract title/content from post`);
+            continue;
+          }
+
+          console.log(`    Extracted - Title: ${parsed.title}`);
+          console.log(`    Extracted - Content: ${parsed.content.substring(0, 100)}...`);
+
+          // Generate comment suggestion
+          const commentSuggestion = await this.generateRedditCommentSuggestion(
+            parsed.title,
+            parsed.content,
+            businessInfo
+          );
+
+          if (commentSuggestion && commentSuggestion.trim().length > 0) {
+            suggestions.push({
+              url,
+              title: parsed.title,
+              suggestedComment: commentSuggestion,
+            });
+            console.log(`    ✓ Generated comment suggestion (${commentSuggestion.length} chars)`);
+          }
+
+        } catch (error) {
+          console.error(`    Error processing Reddit URL ${url}:`, error);
+          continue;
+        }
+      }
+
+      console.log(`\n✓ Generated ${suggestions.length} Reddit comment suggestion(s)`);
+      return suggestions;
+
+    } catch (error) {
+      console.error('Error searching and analyzing Reddit posts:', error);
+      return [];
+    }
+  }
+
+  /**
    * Generate SEO content ideas based on sources that are being quoted
    */
   async generateSEOContentIdeas(

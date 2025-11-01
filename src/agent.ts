@@ -124,14 +124,14 @@ export class VisibilityReportAgent {
 
       console.log(`📊 URL found: ${url}`);
       console.log(
-        `🌐 Using Browser Use to extract ALL business information from website...`
+        `🌐 Using OpenAI web search to extract business information from website...`
       );
 
-      // Use Browser Use to extract ALL business information
+      // Use OpenAI web search to extract ALL business information
       const websiteExtraction =
-        await this.browserUseService.extractBusinessInfo(
+        await this.openAIService.extractBusinessInfoFromUrl(
           url,
-          businessNameHint || "the business"
+          businessNameHint
         );
 
       if (!websiteExtraction.success || !websiteExtraction.data) {
@@ -147,19 +147,18 @@ export class VisibilityReportAgent {
 
       console.log("✓ Website information extracted successfully");
 
-      // Build business info from Browser Use extraction
+      // Build business info from web search extraction
+      const extractedData = websiteExtraction.data;
       const businessInfo = {
-        businessName:
-          businessNameHint ||
-          websiteExtraction.data.businessDescription?.split(" ")[0] ||
-          "Unknown Business",
+        businessName: extractedData.businessName,
         industry: "Technology / Software", // Will be inferred by OpenAI in the report
-        productsServices: websiteExtraction.data.businessDescription || "",
-        targetCustomers: websiteExtraction.data.targetMarkets?.join(", ") || "",
-        location: websiteExtraction.data.location || "",
+        productsServices: extractedData.businessDescription ||
+          [...extractedData.products, ...extractedData.services].join(", "),
+        targetCustomers: extractedData.targetMarkets?.join(", ") || "",
+        location: extractedData.location || "",
         website: url,
         url: url,
-        additionalContext: "", // No longer storing additionalInfo
+        additionalContext: extractedData.keyFeatures?.join(", ") || "",
       };
 
       console.log(`Processing report for: ${businessInfo.businessName}`);
@@ -196,14 +195,14 @@ export class VisibilityReportAgent {
       );
       console.log('\n✓ All prompts processed');
 
-      // Generate Reddit suggestions
+      // Generate Reddit suggestions using Browser Use
       console.log("\n🔍 Generating Reddit comment suggestions...");
       const redditSuggestions = await this.generateRedditSuggestions(
         chatGPTResponses,
         businessInfo
       );
       console.log(`✓ Reddit suggestions result: ${redditSuggestions.length} suggestion(s)`);
-      
+
       if (redditSuggestions.length > 0) {
         console.log("  Reddit suggestions details:");
         redditSuggestions.forEach((suggestion, idx) => {
