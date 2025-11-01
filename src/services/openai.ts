@@ -283,12 +283,15 @@ Only return the JSON array, no additional text.`;
     businessInfo: BusinessInfo,
     sources: string[]
   ): Promise<SingleRunResult> {
-    const analysisPrompt = `Analyze this web search result to determine if the business "${businessInfo.businessName}" was mentioned.
+    const analysisPrompt = `Analyze this web search result to determine if the business "${businessInfo.businessName}" was mentioned, and extract ALL competitors/alternatives mentioned.
 
 Original Query: ${prompt}
 
 Web Search Response:
 ${webSearchText}
+
+Sources:
+${sources.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Business Information:
 - Name: ${businessInfo.businessName}
@@ -296,11 +299,28 @@ Business Information:
 - Industry: ${businessInfo.industry}
 - Products/Services: ${businessInfo.productsServices}
 
-Task: Determine if this business was mentioned in the response, and if so, what rank/position it appeared at.
+Task:
+1. Determine if this business was mentioned in the response, and if so, what rank/position it appeared at.
+2. Extract ALL other businesses/competitors mentioned in the response with their rank and which source URL they came from (match the source number to the list above).
 
 Return a JSON object with:
 - businessMentioned (boolean): true if the business was explicitly mentioned or recommended
 - rank (number or null): If mentioned, the position in the list (1 for first, 2 for second, etc.). null if not mentioned or not in a ranked list.
+- competitors (array): List of ALL other businesses mentioned. Each should have:
+  - name (string): The competitor's name
+  - rank (number): Their position in the recommendation (1 for first, 2 for second, etc.)
+  - sourceIndex (number or null): The source number (1-based index) from the sources list above that this competitor came from, or null if unclear
+
+Example format:
+{
+  "businessMentioned": false,
+  "rank": null,
+  "competitors": [
+    {"name": "Competitor A", "rank": 1, "sourceIndex": 2},
+    {"name": "Competitor B", "rank": 2, "sourceIndex": 2},
+    {"name": "Competitor C", "rank": 3, "sourceIndex": 5}
+  ]
+}
 
 Only return the JSON object, no additional text.`;
 
@@ -310,7 +330,7 @@ Only return the JSON object, no additional text.`;
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing search results and determining business mentions and rankings. Be strict: only mark businessMentioned as true if the business is explicitly mentioned by name or clearly identifiable.',
+            content: 'You are an expert at analyzing search results and determining business mentions and rankings. Extract ALL businesses mentioned, not just the top ones. Be strict: only mark businessMentioned as true if the business is explicitly mentioned by name or clearly identifiable.',
           },
           {
             role: 'user',
@@ -324,10 +344,20 @@ Only return the JSON object, no additional text.`;
       const content = response.choices[0]?.message?.content || '{}';
       const parsed = JSON.parse(content);
 
+      // Map sourceIndex to actual source URLs
+      const competitors = (parsed.competitors || []).map((comp: any) => ({
+        name: comp.name,
+        rank: comp.rank,
+        sourceUrl: comp.sourceIndex && comp.sourceIndex >= 1 && comp.sourceIndex <= sources.length
+          ? sources[comp.sourceIndex - 1]
+          : null,
+      }));
+
       return {
         businessMentioned: parsed.businessMentioned || false,
         rank: parsed.rank || null,
         sources: sources, // Include ALL sources from web search
+        competitors,
       };
     } catch (error) {
       console.error('Failed to analyze web search results:', error);
@@ -335,6 +365,7 @@ Only return the JSON object, no additional text.`;
         businessMentioned: false,
         rank: null,
         sources: sources, // Include ALL sources even on error
+        competitors: [],
       };
     }
   }
@@ -367,6 +398,7 @@ Only return the JSON object, no additional text.`;
             businessMentioned: false,
             rank: null,
             sources: [],
+            competitors: [],
           };
         }
 
@@ -384,6 +416,7 @@ Only return the JSON object, no additional text.`;
           businessMentioned: false,
           rank: null,
           sources: [],
+          competitors: [],
         };
       }
     });

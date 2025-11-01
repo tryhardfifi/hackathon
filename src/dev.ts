@@ -25,7 +25,7 @@ function question(prompt: string): Promise<string> {
 }
 
 async function main() {
-  console.log('🚀 GPT Visibility Report - Development Mode\n');
+  console.log('🚀 Presence Report - Development Mode\n');
 
   // Validate config
   try {
@@ -223,7 +223,7 @@ async function main() {
         const agentMailService = new AgentMailService();
         await agentMailService.sendEmail(
           email,
-          `GPT Visibility Report - ${businessInfo.businessName}`,
+          `Presence Report: ${businessInfo.businessName}`,
           htmlReport,
           textReport
         );

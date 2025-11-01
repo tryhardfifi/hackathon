@@ -26,10 +26,17 @@ export interface Recommendation {
   priority: number;
 }
 
+export interface CompetitorMention {
+  name: string;
+  rank: number;
+  sourceUrl: string | null;
+}
+
 export interface SingleRunResult {
   businessMentioned: boolean;
   rank: number | null;
   sources: string[];
+  competitors: CompetitorMention[];
 }
 
 export interface ChatGPTResponse {

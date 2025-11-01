@@ -150,10 +150,25 @@ export function generateMockChatGPTResponses(
 
       runSources.forEach(s => allRunSources.add(s));
 
+      // Generate mock competitors for this run
+      const competitorNames = [
+        'CompetitorCo', 'RivalTech', 'AlternativeSolutions', 'BetterChoice Inc',
+        'TopRated Services', 'Premium Products', 'Elite Providers', 'Quality First',
+        'Market Leader', 'Industry Expert', 'Trusted Brand', 'Popular Option'
+      ];
+
+      const numCompetitors = Math.floor(Math.random() * 4) + 2; // 2-5 competitors
+      const competitors = Array.from({ length: numCompetitors }, (_, i) => ({
+        name: competitorNames[Math.floor(Math.random() * competitorNames.length)] + ` ${i + 1}`,
+        rank: i + 1 + (runMentioned && runRank ? 1 : 0), // Start after our business if mentioned
+        sourceUrl: runSources[Math.floor(Math.random() * runSources.length)] || null,
+      }));
+
       runs.push({
         businessMentioned: runMentioned,
         rank: runRank,
         sources: runSources,
+        competitors,
       });
 
       if (runMentioned) {

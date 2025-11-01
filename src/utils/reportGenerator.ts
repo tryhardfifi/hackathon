@@ -13,45 +13,69 @@ export function generateHTMLReport(report: Report): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPT Visibility Report - ${escapeHTML(report.businessName)}</title>
+  <title>Presence Report: ${escapeHTML(report.businessName)}</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       line-height: 1.6;
-      color: #333;
+      color: #000;
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
-      background-color: #f5f5f5;
+      background-color: #fff;
     }
     .container {
       background-color: white;
-      border-radius: 8px;
-      padding: 40px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 60px 40px;
+    }
+    .header {
+      margin-bottom: 60px;
+      border-bottom: 2px solid #000;
+      padding-bottom: 30px;
+    }
+    .brand {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #000;
+      margin-bottom: 8px;
+    }
+    .tagline {
+      font-size: 13px;
+      color: #666;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      text-transform: lowercase;
     }
     h1 {
-      color: #1a1a1a;
-      border-bottom: 3px solid #4CAF50;
-      padding-bottom: 10px;
+      color: #000;
+      font-size: 24px;
+      font-weight: 600;
+      margin-top: 40px;
       margin-bottom: 10px;
+      letter-spacing: -0.3px;
     }
     .meta {
       color: #666;
-      font-size: 14px;
-      margin-bottom: 30px;
+      font-size: 13px;
+      margin-bottom: 40px;
+      font-weight: 400;
     }
     h2 {
-      color: #2c3e50;
+      color: #000;
       margin-top: 40px;
       margin-bottom: 20px;
-      font-size: 24px;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
     }
     h3 {
-      color: #34495e;
-      font-size: 18px;
+      color: #000;
+      font-size: 16px;
+      font-weight: 600;
       margin-top: 20px;
       margin-bottom: 10px;
+      letter-spacing: -0.2px;
     }
     .category {
       margin-bottom: 25px;
@@ -67,217 +91,225 @@ export function generateHTMLReport(report: Report): string {
     .assessment {
       display: inline-block;
       padding: 8px 16px;
-      border-radius: 4px;
-      font-weight: bold;
+      border: 1px solid #000;
+      font-weight: 500;
       margin: 10px 0;
+      font-size: 13px;
     }
     .assessment.high {
-      background-color: #d4edda;
-      color: #155724;
+      background-color: #000;
+      color: #fff;
     }
     .assessment.medium {
-      background-color: #fff3cd;
-      color: #856404;
+      background-color: #fff;
+      color: #000;
+      border: 1px solid #000;
     }
     .assessment.low {
-      background-color: #f8d7da;
-      color: #721c24;
+      background-color: #f5f5f5;
+      color: #000;
+      border: 1px solid #ccc;
     }
     .section {
-      background-color: #f8f9fa;
+      background-color: #fafafa;
       padding: 20px;
-      border-radius: 6px;
       margin: 20px 0;
+      border: 1px solid #e0e0e0;
     }
     .recommendation {
-      background-color: #e8f5e9;
+      background-color: #fff;
       padding: 20px;
-      border-radius: 6px;
       margin: 15px 0;
-      border-left: 4px solid #4CAF50;
+      border-left: 3px solid #000;
     }
     .recommendation h3 {
       margin-top: 0;
-      color: #2e7d32;
+      color: #000;
     }
     .footer {
-      margin-top: 40px;
+      margin-top: 60px;
       padding-top: 20px;
-      border-top: 1px solid #ddd;
-      font-size: 12px;
+      border-top: 1px solid #000;
+      font-size: 11px;
       color: #666;
     }
     .priority-badge {
       display: inline-block;
-      background-color: #2196F3;
+      background-color: #000;
       color: white;
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: bold;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 600;
       margin-left: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .response-card {
       background-color: #ffffff;
       border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 20px;
+      padding: 25px;
       margin: 15px 0;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     .response-card.mentioned {
-      border-left: 4px solid #4CAF50;
+      border-left: 3px solid #000;
     }
     .response-card.not-mentioned {
-      border-left: 4px solid #e0e0e0;
+      border-left: 3px solid #ccc;
     }
     .response-prompt {
-      font-weight: 600;
-      color: #2c3e50;
+      font-weight: 500;
+      color: #000;
       margin-bottom: 12px;
-      font-size: 15px;
+      font-size: 14px;
+      line-height: 1.5;
     }
     .response-status {
       display: inline-block;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: bold;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
       margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .response-status.mentioned {
-      background-color: #d4edda;
-      color: #155724;
+      background-color: #000;
+      color: #fff;
     }
     .response-status.not-mentioned {
-      background-color: #f8d7da;
-      color: #721c24;
+      background-color: #fff;
+      color: #000;
+      border: 1px solid #000;
     }
     .probability-badge {
       display: inline-block;
-      background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+      background: #000;
       color: white;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 13px;
+      padding: 5px 12px;
+      font-weight: 600;
+      font-size: 11px;
       margin-left: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .runs-details {
       margin-top: 15px;
-      padding: 12px;
-      background-color: #f8f9fa;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 15px;
+      background-color: #fafafa;
+      border: 1px solid #e0e0e0;
+      font-size: 12px;
     }
     .run-item {
-      padding: 6px 0;
+      padding: 10px 0;
       border-bottom: 1px solid #e0e0e0;
     }
     .run-item:last-child {
       border-bottom: none;
     }
+    .run-item:first-child {
+      padding-top: 0;
+    }
     .run-label {
       font-weight: 600;
-      color: #555;
+      color: #000;
       display: inline-block;
       min-width: 70px;
+      font-size: 11px;
     }
     .run-result {
       display: inline-block;
       margin-left: 10px;
+      font-size: 11px;
     }
     .run-result.mentioned {
-      color: #155724;
+      color: #000;
+      font-weight: 600;
     }
     .run-result.not-mentioned {
-      color: #721c24;
+      color: #666;
     }
     .rank-badge {
       display: inline-block;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #000;
       color: white;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 13px;
+      padding: 5px 12px;
+      font-weight: 600;
+      font-size: 11px;
       margin-left: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .sources {
       margin-top: 12px;
       padding-top: 12px;
-      border-top: 1px solid #f0f0f0;
+      border-top: 1px solid #e0e0e0;
     }
     .sources-label {
-      font-size: 12px;
-      color: #666;
+      font-size: 10px;
+      color: #000;
       font-weight: 600;
       margin-bottom: 8px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
     }
     .source-link {
       display: inline-block;
-      color: #2196F3;
-      text-decoration: none;
-      font-size: 13px;
+      color: #000;
+      text-decoration: underline;
+      font-size: 11px;
       margin: 4px 8px 4px 0;
-      padding: 4px 8px;
-      background-color: #f5f5f5;
-      border-radius: 4px;
-      transition: background-color 0.2s;
+      padding: 4px 0;
+      transition: opacity 0.2s;
     }
     .source-link:hover {
-      background-color: #e8f5e9;
-      text-decoration: underline;
+      opacity: 0.6;
     }
     .stats-summary {
       width: 100%;
-      margin: 30px 0;
+      margin: 40px 0;
       border-collapse: separate;
-      border-spacing: 15px;
+      border-spacing: 10px;
     }
     .stat-item {
-      background-color: #f8f9fa;
-      border: 2px solid #e0e0e0;
-      color: #333;
-      padding: 20px;
-      border-radius: 8px;
+      background-color: #fff;
+      border: 2px solid #000;
+      color: #000;
+      padding: 25px 20px;
       text-align: center;
       width: 25%;
     }
     .stat-emoji {
-      font-size: 32px;
-      margin-bottom: 10px;
-      display: block;
+      display: none;
     }
     .stat-value {
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 8px;
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -1px;
     }
     .stat-label {
-      font-size: 12px;
-      opacity: 0.95;
+      font-size: 10px;
+      color: #000;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 500;
+      letter-spacing: 0.8px;
+      font-weight: 600;
     }
     .source-chart {
       margin: 40px 0;
       background-color: #ffffff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 25px;
+      border: 2px solid #000;
+      padding: 30px;
     }
     .source-chart h2 {
       margin-top: 0;
-      margin-bottom: 20px;
-      color: #2c3e50;
-      font-size: 20px;
+      margin-bottom: 25px;
+      color: #000;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
     }
     .source-chart-row {
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       display: table;
       width: 100%;
     }
@@ -285,10 +317,11 @@ export function generateHTMLReport(report: Report): string {
       display: table-cell;
       vertical-align: middle;
       width: 40%;
-      font-size: 13px;
-      color: #333;
+      font-size: 11px;
+      color: #000;
       padding-right: 15px;
       word-break: break-word;
+      font-weight: 500;
     }
     .source-chart-bar-container {
       display: table-cell;
@@ -298,15 +331,13 @@ export function generateHTMLReport(report: Report): string {
     }
     .source-chart-bar-container-inner {
       width: 100%;
-      background-color: #f0f0f0;
-      border-radius: 4px;
-      height: 24px;
+      background-color: #f5f5f5;
+      height: 20px;
       position: relative;
     }
     .source-chart-bar {
-      height: 24px;
-      background-color: #4285f4;
-      border-radius: 4px;
+      height: 20px;
+      background-color: #000;
       min-width: 2px;
     }
     .source-chart-value {
@@ -314,28 +345,30 @@ export function generateHTMLReport(report: Report): string {
       vertical-align: middle;
       width: 10%;
       text-align: right;
-      font-size: 13px;
-      font-weight: 600;
-      color: #333;
+      font-size: 12px;
+      font-weight: 700;
+      color: #000;
     }
     .source-chart-empty {
-      color: #999;
+      color: #666;
       font-style: italic;
       padding: 20px;
       text-align: center;
+      font-size: 13px;
     }
     .pie-chart-container {
       margin: 40px 0;
       background-color: #ffffff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 25px;
+      border: 2px solid #000;
+      padding: 30px;
     }
     .pie-chart-container h2 {
       margin-top: 0;
-      margin-bottom: 20px;
-      color: #2c3e50;
-      font-size: 20px;
+      margin-bottom: 25px;
+      color: #000;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
     }
     .pie-chart-visual {
       display: table;
@@ -361,77 +394,83 @@ export function generateHTMLReport(report: Report): string {
     }
     .pie-segment-box {
       width: 35px;
-      border-radius: 4px 4px 0 0;
       margin: 0 auto;
       min-height: 10px;
       position: relative;
       bottom: 0;
     }
     .pie-segment-label {
-      font-size: 11px;
-      color: #666;
+      font-size: 10px;
+      color: #000;
       word-break: break-word;
       max-width: 80px;
       margin: 0 auto;
+      font-weight: 500;
     }
     .pie-segment-value {
-      font-size: 12px;
-      font-weight: 600;
-      color: #333;
+      font-size: 11px;
+      font-weight: 700;
+      color: #000;
       margin-top: 3px;
     }
     .pie-legend {
       margin-top: 25px;
       padding-top: 20px;
-      border-top: 1px solid #e0e0e0;
+      border-top: 2px solid #000;
     }
     .pie-legend-item {
       display: table;
       width: 100%;
-      margin-bottom: 12px;
-      padding: 8px;
-      background-color: #f8f9fa;
-      border-radius: 4px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: #fafafa;
+      border: 1px solid #e0e0e0;
     }
     .pie-legend-color {
       display: table-cell;
-      width: 20px;
-      height: 20px;
-      border-radius: 3px;
+      width: 16px;
+      height: 16px;
       vertical-align: middle;
+      border: 1px solid #000;
     }
     .pie-legend-label {
       display: table-cell;
       vertical-align: middle;
-      padding-left: 10px;
-      font-size: 13px;
-      color: #333;
+      padding-left: 12px;
+      font-size: 11px;
+      color: #000;
+      font-weight: 500;
     }
     .pie-legend-value {
       display: table-cell;
       vertical-align: middle;
       text-align: right;
-      font-size: 13px;
-      font-weight: 600;
-      color: #333;
+      font-size: 12px;
+      font-weight: 700;
+      color: #000;
     }
     .pie-legend-percentage {
       display: table-cell;
       vertical-align: middle;
       text-align: right;
       padding-left: 10px;
-      font-size: 12px;
+      font-size: 11px;
       color: #666;
       width: 60px;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>GPT Visibility Report</h1>
+    <div class="header">
+      <div class="brand">Presence</div>
+      <div class="tagline">dominate AI recommendations</div>
+    </div>
+
+    <h1>${escapeHTML(report.businessName)}</h1>
     <div class="meta">
-      <strong>${escapeHTML(report.businessName)}</strong><br>
-      Generated: ${report.generatedDate}
+      Report generated ${report.generatedDate}
     </div>
 
     ${
@@ -443,10 +482,12 @@ export function generateHTMLReport(report: Report): string {
     ${
       report.chatGPTResponses && report.chatGPTResponses.length > 0
         ? `
+    ${generateCompetitorAnalysis(report.chatGPTResponses)}
+
     ${generateSourceDomainBarChart(report.chatGPTResponses)}
 
-    <h2>🎯 ChatGPT Response Analysis</h2>
-    <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
+    <h2>Detailed Analysis</h2>
+    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Performance breakdown across individual search queries</p>
 
     <div class="section">
       ${report.chatGPTResponses
@@ -458,8 +499,8 @@ export function generateHTMLReport(report: Report): string {
     }
 
     <div class="footer">
-      <p><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary based on many factors including content quality, user queries, and AI model training data.</p>
-      <p>Generated by GPT Visibility Report Agent</p>
+      <p style="margin-bottom: 8px;"><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary.</p>
+      <p style="margin: 0;">Presence &copy; ${new Date().getFullYear()}</p>
     </div>
   </div>
 </body>
@@ -471,7 +512,7 @@ export function generateHTMLReport(report: Report): string {
  * Generate plain text report
  */
 export function generateTextReport(report: Report): string {
-  let text = `GPT VISIBILITY REPORT
+  let text = `PRESENCE REPORT
 ${"=".repeat(60)}
 
 Business: ${report.businessName}
@@ -559,7 +600,7 @@ DISCLAIMER: This report is AI-generated and provides estimates based on
 available information. Actual visibility may vary based on many factors
 including content quality, user queries, and AI model training data.
 
-Generated by GPT Visibility Report Agent
+Generated by Presence
 `;
 
   return text;
@@ -628,19 +669,19 @@ function generateResponseSummary(responses: any[]): string {
         <td class="stat-item">
           <span class="stat-emoji">📊</span>
           <div class="stat-value">${promptCoverage}%</div>
-          <div class="stat-label">Prompt Coverage</div>
+          <div class="stat-label">Query Coverage</div>
         </td>
         <td class="stat-item">
           <span class="stat-emoji">🎲</span>
           <div class="stat-value">${avgProbability}%</div>
-          <div class="stat-label">Avg Probability</div>
+          <div class="stat-label">Mention Rate</div>
         </td>
         <td class="stat-item">
           <span class="stat-emoji">🏆</span>
           <div class="stat-value">${
             avgRank !== null ? `#${avgRank}` : "N/A"
           }</div>
-          <div class="stat-label">Avg Rank</div>
+          <div class="stat-label">Average Position</div>
         </td>
       </tr>
     </table>
@@ -676,7 +717,7 @@ function generateSourceMentionsChart(
   if (allSources.length === 0) {
     return `
     <div class="source-chart">
-      <h2>📈 Top Mentioned Sources</h2>
+      <h2>Top Mentioned Sources</h2>
       <div class="source-chart-empty">No sources found in ChatGPT responses</div>
     </div>
     `;
@@ -699,7 +740,7 @@ function generateSourceMentionsChart(
         <div class="source-chart-label">
           <a href="${escapeHTML(
             source
-          )}" style="color: #4285f4; text-decoration: none;" target="_blank">${escapeHTML(
+          )}" style="color: #000; text-decoration: underline;" target="_blank">${escapeHTML(
         displaySource
       )}</a>
         </div>
@@ -716,9 +757,99 @@ function generateSourceMentionsChart(
 
   return `
     <div class="source-chart">
-      <h2>📈 Top Mentioned Sources</h2>
-      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Most referenced sources in ChatGPT responses:</p>
+      <h2>Top Mentioned Sources</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Most referenced sources in ChatGPT responses</p>
       ${chartRows}
+    </div>
+  `;
+}
+
+/**
+ * Generate competitor analysis showing who's winning at AI SEO
+ */
+function generateCompetitorAnalysis(responses: any[]): string {
+  // Collect all competitors across all runs
+  const competitorStats: Record<string, {
+    mentions: number;
+    avgRank: number;
+    totalRank: number;
+    sources: Set<string>;
+  }> = {};
+
+  responses.forEach((response) => {
+    if (response.runs && Array.isArray(response.runs)) {
+      response.runs.forEach((run: any) => {
+        if (run.competitors && Array.isArray(run.competitors)) {
+          run.competitors.forEach((comp: any) => {
+            if (!competitorStats[comp.name]) {
+              competitorStats[comp.name] = {
+                mentions: 0,
+                avgRank: 0,
+                totalRank: 0,
+                sources: new Set(),
+              };
+            }
+            competitorStats[comp.name].mentions++;
+            competitorStats[comp.name].totalRank += comp.rank || 0;
+            if (comp.sourceUrl) {
+              competitorStats[comp.name].sources.add(comp.sourceUrl);
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Calculate average ranks
+  Object.keys(competitorStats).forEach(name => {
+    const stats = competitorStats[name];
+    stats.avgRank = stats.totalRank / stats.mentions;
+  });
+
+  // Sort by mentions (descending), then by average rank (ascending)
+  const sortedCompetitors = Object.entries(competitorStats)
+    .sort((a, b) => {
+      if (b[1].mentions !== a[1].mentions) {
+        return b[1].mentions - a[1].mentions;
+      }
+      return a[1].avgRank - b[1].avgRank;
+    })
+    .slice(0, 10); // Top 10 competitors
+
+  if (sortedCompetitors.length === 0) {
+    return '';
+  }
+
+  const maxMentions = sortedCompetitors[0][1].mentions;
+
+  const competitorRows = sortedCompetitors
+    .map(([name, stats]) => {
+      const percentage = maxMentions > 0 ? (stats.mentions / maxMentions) * 100 : 0;
+      const barWidth = Math.max(percentage, stats.mentions > 0 ? 2 : 0);
+      const displayName = name.length > 40 ? name.substring(0, 37) + "..." : name;
+
+      return `
+      <div class="source-chart-row">
+        <div class="source-chart-label">
+          ${escapeHTML(displayName)}
+          <div style="font-size: 9px; color: #999; margin-top: 2px;">Avg rank: #${stats.avgRank.toFixed(1)}</div>
+        </div>
+        <div class="source-chart-bar-container">
+          <div class="source-chart-bar-container-inner">
+            <div class="source-chart-bar" style="width: ${barWidth}%;"></div>
+          </div>
+        </div>
+        <div class="source-chart-value">${stats.mentions}</div>
+      </div>
+    `;
+    })
+    .join("");
+
+  return `
+    <div class="source-chart">
+      <h2>Competitive Landscape</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Companies dominating AI search results in your category</p>
+      ${competitorRows}
     </div>
   `;
 }
@@ -754,7 +885,7 @@ function generateSourceDomainBarChart(responses: any[]): string {
   if (Object.keys(domainCounts).length === 0) {
     return `
     <div class="source-chart">
-      <h2>📊 Source Distribution by Domain</h2>
+      <h2>Source Distribution by Domain</h2>
       <div class="source-chart-empty">No sources found in ChatGPT responses</div>
     </div>
     `;
@@ -795,8 +926,8 @@ function generateSourceDomainBarChart(responses: any[]): string {
 
   return `
     <div class="source-chart">
-      <h2>📊 Source Distribution by Domain</h2>
-      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Top domains referenced across all ChatGPT responses:</p>
+      <h2>Content Sources</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Most referenced domains in AI recommendations</p>
       ${chartRows}
     </div>
   `;
@@ -809,7 +940,7 @@ function generateResponseCard(response: any, index: number): string {
   const isMentioned = response.businessMentioned;
   const cardClass = isMentioned ? "mentioned" : "not-mentioned";
   const statusClass = isMentioned ? "mentioned" : "not-mentioned";
-  const statusText = isMentioned ? "✓ Mentioned" : "✗ Not Mentioned";
+  const statusText = isMentioned ? "Mentioned" : "Not Mentioned";
 
   const probability = response.mentionProbability || 0;
   const probabilityText = `${probability.toFixed(1)}%`;
@@ -826,12 +957,32 @@ function generateResponseCard(response: any, index: number): string {
       .map((run: any, idx: number) => {
         const runClass = run.businessMentioned ? "mentioned" : "not-mentioned";
         const runText = run.businessMentioned
-          ? `✓ Mentioned${run.rank ? ` (Rank #${run.rank})` : ""}`
-          : "✗ Not Mentioned";
+          ? `Mentioned${run.rank ? ` (Rank #${run.rank})` : ""}`
+          : "Not Mentioned";
+
+        // Generate competitor list for this run
+        let competitorsHTML = "";
+        if (run.competitors && run.competitors.length > 0) {
+          const topCompetitors = run.competitors.slice(0, 5).sort((a: any, b: any) => a.rank - b.rank);
+          competitorsHTML = `
+            <div style="margin-top: 8px; padding-left: 20px; border-left: 2px solid #e0e0e0;">
+              <div style="font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Also Ranked</div>
+              ${topCompetitors.map((comp: any) => `
+                <div style="font-size: 11px; margin: 4px 0; color: #333;">
+                  <span style="font-weight: 600;">#${comp.rank}</span> ${escapeHTML(comp.name)}
+                  ${comp.sourceUrl ? `<a href="${escapeHTML(comp.sourceUrl)}" style="color: #666; text-decoration: underline; margin-left: 6px; font-size: 10px;" target="_blank">view source</a>` : ''}
+                </div>
+              `).join('')}
+              ${run.competitors.length > 5 ? `<div style="font-size: 10px; color: #999; margin-top: 4px;">+ ${run.competitors.length - 5} more</div>` : ''}
+            </div>
+          `;
+        }
+
         return `
         <div class="run-item">
           <span class="run-label">Run ${idx + 1}:</span>
           <span class="run-result ${runClass}">${runText}</span>
+          ${competitorsHTML}
         </div>
       `;
       })
@@ -839,7 +990,7 @@ function generateResponseCard(response: any, index: number): string {
 
     runsHTML = `
       <div class="runs-details">
-        <strong>Individual Runs (${response.totalRuns} total):</strong>
+        <strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Test Results (${response.totalRuns} queries)</strong>
         ${runsDetails}
       </div>
     `;
@@ -852,7 +1003,7 @@ function generateResponseCard(response: any, index: number): string {
 
     sourcesHTML = `
       <div class="sources">
-        <div class="sources-label">Top Sources Used:</div>
+        <div class="sources-label">References</div>
         ${topSources
           .map(
             (source: string) =>
@@ -861,7 +1012,7 @@ function generateResponseCard(response: any, index: number): string {
               )}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
           )
           .join("")}
-        ${remainingCount > 0 ? `<div style="color: #666; font-size: 12px; margin-top: 8px;">+ ${remainingCount} more source${remainingCount > 1 ? 's' : ''}</div>` : ''}
+        ${remainingCount > 0 ? `<div style="color: #666; font-size: 12px; margin-top: 8px;">+ ${remainingCount} more</div>` : ''}
       </div>
     `;
   }

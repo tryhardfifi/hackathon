@@ -181,7 +181,7 @@ async function sendMockReport() {
     if (shouldSendEmail && recipientEmail) {
       console.log(`📧 Sending report to ${recipientEmail}...`);
       const agentMailService = new AgentMailService();
-      const subject = `GPT Visibility Report - ${businessInfo.businessName}`;
+      const subject = `Presence Report: ${businessInfo.businessName}`;
       await agentMailService.sendEmail(
         recipientEmail,
         subject,
