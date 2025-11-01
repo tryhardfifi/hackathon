@@ -35,7 +35,7 @@ export class AgentMailService {
   }
 
   /**
-   * Send a reply to a message
+   * Send a reply to a message (automatically replies in the same thread)
    */
   async replyToMessage(
     messageId: string,
@@ -43,17 +43,25 @@ export class AgentMailService {
     textContent: string
   ): Promise<void> {
     try {
-      console.log(`Sending reply to message ${messageId.substring(0, 30)}...`);
+      // Get the original message to log thread info
+      const originalMessage = await this.getMessage(messageId);
+      const threadId = originalMessage.thread_id;
+
+      console.log(`📧 Sending reply to message ${messageId.substring(0, 30)}...`);
+      console.log(`  Thread ID: ${threadId}`);
+      console.log(`  Original From: ${originalMessage.from || originalMessage.from_}`);
+      console.log(`  Original Subject: ${originalMessage.subject}`);
       console.log(`  Inbox: ${this.inboxId}`);
       console.log(`  HTML length: ${htmlContent.length} chars`);
       console.log(`  Text length: ${textContent.length} chars`);
 
+      // The .reply() method automatically sends to the same thread as the original message
       const response = await this.client.inboxes.messages.reply(this.inboxId, messageId, {
         html: htmlContent,
         text: textContent,
       });
 
-      console.log(`✓ Reply sent successfully`);
+      console.log(`✓ Reply sent successfully in thread ${threadId}`);
       console.log(`  Response:`, JSON.stringify(response, null, 2));
     } catch (error) {
       console.error('Error sending reply:', error);
