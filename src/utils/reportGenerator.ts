@@ -153,6 +153,46 @@ export function generateHTMLReport(report: Report): string {
       background-color: #f8d7da;
       color: #721c24;
     }
+    .probability-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+      margin-left: 8px;
+    }
+    .runs-details {
+      margin-top: 15px;
+      padding: 12px;
+      background-color: #f8f9fa;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .run-item {
+      padding: 6px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .run-item:last-child {
+      border-bottom: none;
+    }
+    .run-label {
+      font-weight: 600;
+      color: #555;
+      display: inline-block;
+      min-width: 70px;
+    }
+    .run-result {
+      display: inline-block;
+      margin-left: 10px;
+    }
+    .run-result.mentioned {
+      color: #155724;
+    }
+    .run-result.not-mentioned {
+      color: #721c24;
+    }
     .rank-badge {
       display: inline-block;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -204,7 +244,7 @@ export function generateHTMLReport(report: Report): string {
       padding: 20px;
       border-radius: 8px;
       text-align: center;
-      width: 25%;
+      width: 20%;
     }
     .stat-emoji {
       font-size: 32px;
@@ -511,22 +551,40 @@ ${"-".repeat(60)}
     const mentionedCount = report.chatGPTResponses.filter(
       (r) => r.businessMentioned
     ).length;
-    text += `Mention Rate: ${mentionedCount}/${
+    const avgProbability = report.chatGPTResponses.length > 0
+      ? Math.round(report.chatGPTResponses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) / report.chatGPTResponses.length)
+      : 0;
+    const totalRuns = report.chatGPTResponses.reduce((sum, r) => sum + (r.totalRuns || 1), 0);
+
+    text += `Prompt Coverage: ${mentionedCount}/${
       report.chatGPTResponses.length
     } (${Math.round(
       (mentionedCount / report.chatGPTResponses.length) * 100
-    )}%)\n\n`;
+    )}%)\n`;
+    text += `Average Probability: ${avgProbability}%\n`;
+    text += `Total Runs: ${totalRuns}\n\n`;
 
     report.chatGPTResponses.forEach((response, idx) => {
       text += `${idx + 1}. ${response.prompt}\n`;
       text += `   Status: ${
         response.businessMentioned ? "✓ Mentioned" : "✗ Not Mentioned"
       }\n`;
+      text += `   Probability: ${(response.mentionProbability || 0).toFixed(1)}%\n`;
       if (response.businessMentioned && response.rank) {
-        text += `   Rank: #${response.rank}\n`;
+        text += `   Average Rank: #${response.rank.toFixed(1)}\n`;
       }
+
+      // Add individual runs
+      if (response.runs && response.runs.length > 0) {
+        text += `   Individual Runs:\n`;
+        response.runs.forEach((run: any, runIdx: number) => {
+          const runStatus = run.businessMentioned ? `✓ Mentioned${run.rank ? ` (Rank #${run.rank})` : ''}` : '✗ Not Mentioned';
+          text += `     Run ${runIdx + 1}: ${runStatus}\n`;
+        });
+      }
+
       if (response.sources && response.sources.length > 0) {
-        text += `   Sources:\n`;
+        text += `   Sources (across all runs):\n`;
         response.sources.forEach((source: string) => {
           text += `     • ${source}\n`;
         });
@@ -621,18 +679,31 @@ function generateResponseSummary(responses: any[]): string {
 
   const topRankCount = mentionedResponses.filter((r) => r.rank === 1).length;
 
+  // Calculate average mention probability across all prompts
+  const avgProbability = responses.length > 0
+    ? Math.round(responses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) / responses.length)
+    : 0;
+
+  // Calculate total runs
+  const totalRuns = responses.reduce((sum, r) => sum + (r.totalRuns || 1), 0);
+
   return `
     <table class="stats-summary" cellpadding="0" cellspacing="0" border="0">
       <tr>
         <td class="stat-item">
           <span class="stat-emoji">📊</span>
           <div class="stat-value">${mentionPercentage}%</div>
-          <div class="stat-label">Mention Rate</div>
+          <div class="stat-label">Prompt Coverage</div>
         </td>
         <td class="stat-item">
-          <span class="stat-emoji">✅</span>
-          <div class="stat-value">${mentionedCount}/${totalResponses}</div>
-          <div class="stat-label">Times Mentioned</div>
+          <span class="stat-emoji">🎲</span>
+          <div class="stat-value">${avgProbability}%</div>
+          <div class="stat-label">Avg Probability</div>
+        </td>
+        <td class="stat-item">
+          <span class="stat-emoji">🔄</span>
+          <div class="stat-value">${totalRuns}</div>
+          <div class="stat-label">Total Runs</div>
         </td>
         <td class="stat-item">
           <span class="stat-emoji">🏆</span>
@@ -825,16 +896,45 @@ function generateResponseCard(response: any, index: number): string {
   const statusClass = isMentioned ? "mentioned" : "not-mentioned";
   const statusText = isMentioned ? "✓ Mentioned" : "✗ Not Mentioned";
 
+  const probability = response.mentionProbability || 0;
+  const probabilityText = `${probability.toFixed(1)}%`;
+
   let rankHTML = "";
   if (isMentioned && response.rank !== null) {
-    rankHTML = `<span class="rank-badge">Rank #${response.rank}</span>`;
+    rankHTML = `<span class="rank-badge">Avg Rank #${response.rank.toFixed(1)}</span>`;
+  }
+
+  // Generate individual runs details
+  let runsHTML = "";
+  if (response.runs && response.runs.length > 0) {
+    const runsDetails = response.runs
+      .map((run: any, idx: number) => {
+        const runClass = run.businessMentioned ? "mentioned" : "not-mentioned";
+        const runText = run.businessMentioned
+          ? `✓ Mentioned${run.rank ? ` (Rank #${run.rank})` : ""}`
+          : "✗ Not Mentioned";
+        return `
+        <div class="run-item">
+          <span class="run-label">Run ${idx + 1}:</span>
+          <span class="run-result ${runClass}">${runText}</span>
+        </div>
+      `;
+      })
+      .join("");
+
+    runsHTML = `
+      <div class="runs-details">
+        <strong>Individual Runs (${response.totalRuns} total):</strong>
+        ${runsDetails}
+      </div>
+    `;
   }
 
   let sourcesHTML = "";
   if (response.sources && response.sources.length > 0) {
     sourcesHTML = `
       <div class="sources">
-        <div class="sources-label">Sources Used:</div>
+        <div class="sources-label">All Sources Used (Across All Runs):</div>
         ${response.sources
           .map(
             (source: string) =>
@@ -852,8 +952,10 @@ function generateResponseCard(response: any, index: number): string {
       <div class="response-prompt">${escapeHTML(response.prompt)}</div>
       <div>
         <span class="response-status ${statusClass}">${statusText}</span>
+        <span class="probability-badge">${probabilityText} probability</span>
         ${rankHTML}
       </div>
+      ${runsHTML}
       ${sourcesHTML}
     </div>
   `;

@@ -10,6 +10,7 @@ import {
   generateHTMLReport,
   generateTextReport,
 } from "./utils/reportGenerator";
+import { saveDebugLog, saveDebugLogText } from "./utils/debugLogger";
 import { Report } from "./types";
 
 export class VisibilityReportAgent {
@@ -175,16 +176,22 @@ export class VisibilityReportAgent {
         visibilityAnalysis
       );
 
-      // Process all customer prompts with real web search in parallel
-      console.log(`Processing ${customerPrompts.length} prompts with web search in parallel...`);
-      const chatGPTResponses = await Promise.all(
-        customerPrompts.map(customerPrompt =>
-          this.openAIService.processCustomerPrompt(
-            customerPrompt.prompt,
-            businessInfo
-          )
-        )
-      );
+      // Process all customer prompts with real web search sequentially to avoid rate limits
+      console.log(`Processing ${customerPrompts.length} prompts with web search (4 runs each)...`);
+      const chatGPTResponses = [];
+      for (let i = 0; i < customerPrompts.length; i++) {
+        console.log(`\nPrompt ${i + 1}/${customerPrompts.length}:`);
+        const response = await this.openAIService.processCustomerPrompt(
+          customerPrompts[i].prompt,
+          businessInfo
+        );
+        chatGPTResponses.push(response);
+
+        // Small delay between prompts to avoid rate limits
+        if (i < customerPrompts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
 
       // Create report
       const report: Report = {
@@ -205,8 +212,17 @@ export class VisibilityReportAgent {
       const htmlReport = generateHTMLReport(report);
       const textReport = generateTextReport(report);
 
+      // Save debug logs before sending
+      console.log("\nSaving debug logs...");
+      try {
+        saveDebugLog(report, businessInfo, messageId);
+        saveDebugLogText(report, businessInfo, messageId);
+      } catch (error) {
+        console.error("Failed to save debug logs (non-fatal):", error);
+      }
+
       // Send reply
-      console.log("Sending reply...");
+      console.log("\nSending reply...");
       await this.agentMailService.replyToMessage(
         messageId,
         htmlReport,

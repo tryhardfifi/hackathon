@@ -1,4 +1,4 @@
-import { ChatGPTResponse, CustomerPrompt, BusinessInfo } from '../types';
+import { ChatGPTResponse, CustomerPrompt, BusinessInfo, SingleRunResult } from '../types';
 
 /**
  * Generate mocked ChatGPT response data
@@ -61,25 +61,25 @@ export function generateMockChatGPTResponses(
     let rank: number | null = null;
 
     // Higher chance of mention for certain categories
-    const mentionProbability = 
+    const baseMentionChance =
       category.includes('finding') || category.includes('recommend') ? 0.6 :
       category.includes('compar') ? 0.4 :
       category.includes('specific') ? 0.5 :
       0.3;
 
     // Check if prompt mentions business name or industry keywords
-    const mentionsBusinessName = prompt.includes(businessName) || 
+    const mentionsBusinessName = prompt.includes(businessName) ||
                                  prompt.includes(businessInfo.businessName.toLowerCase().split(' ')[0]);
-    const mentionsIndustry = prompt.includes(industry) || 
+    const mentionsIndustry = prompt.includes(industry) ||
                             industry.split(' ').some(word => prompt.includes(word));
 
     if (mentionsBusinessName) {
       businessMentioned = true;
       rank = 1; // Top result if explicitly mentioned
-    } else if (Math.random() < mentionProbability && mentionsIndustry) {
+    } else if (Math.random() < baseMentionChance && mentionsIndustry) {
       businessMentioned = true;
       // Rank between 1-5 if mentioned (with higher chance of lower ranks)
-      rank = Math.random() < 0.4 ? 1 : 
+      rank = Math.random() < 0.4 ? 1 :
              Math.random() < 0.6 ? 2 :
              Math.random() < 0.8 ? 3 :
              Math.random() < 0.9 ? 4 : 5;
@@ -131,11 +131,49 @@ export function generateMockChatGPTResponses(
       }
     }
 
+    // Generate 4 mock runs with some variability
+    const numRuns = 4;
+    const runs: SingleRunResult[] = [];
+    let mentionCount = 0;
+    let totalRank = 0;
+    const allRunSources = new Set<string>();
+
+    for (let i = 0; i < numRuns; i++) {
+      // Add some randomness to each run
+      const runMentioned = businessMentioned && Math.random() < 0.8; // 80% chance if business would be mentioned
+      const runRank = runMentioned ? (rank || Math.floor(Math.random() * 3) + 1) : null;
+
+      // Select sources for this run
+      const runSourceCount = Math.floor(Math.random() * 2) + 2; // 2-3 sources per run
+      const shuffled = [...allSources].sort(() => 0.5 - Math.random());
+      const runSources = shuffled.slice(0, runSourceCount);
+
+      runSources.forEach(s => allRunSources.add(s));
+
+      runs.push({
+        businessMentioned: runMentioned,
+        rank: runRank,
+        sources: runSources,
+      });
+
+      if (runMentioned) {
+        mentionCount++;
+        if (runRank) totalRank += runRank;
+      }
+    }
+
+    const mentionProbability = (mentionCount / numRuns) * 100;
+    const avgRank = mentionCount > 0 ? totalRank / mentionCount : null;
+    const anyMentioned = mentionCount > 0;
+
     return {
       prompt: promptObj.prompt,
-      businessMentioned,
-      rank,
-      sources,
+      businessMentioned: anyMentioned,
+      rank: avgRank,
+      sources: Array.from(allRunSources),
+      mentionProbability,
+      runs,
+      totalRuns: numRuns,
     };
   });
 }

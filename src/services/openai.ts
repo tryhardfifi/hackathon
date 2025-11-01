@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../config';
-import { BusinessInfo, CustomerPrompt, VisibilityAnalysis, Recommendation, ChatGPTResponse } from '../types';
+import { BusinessInfo, CustomerPrompt, VisibilityAnalysis, Recommendation, ChatGPTResponse, SingleRunResult } from '../types';
 import { formatBusinessInfoForPrompt } from '../utils/emailParser';
 
 export class OpenAIService {
@@ -16,7 +16,7 @@ export class OpenAIService {
    * Generate customer prompts that people might use when asking ChatGPT
    */
   async generateCustomerPrompts(businessInfo: BusinessInfo): Promise<CustomerPrompt[]> {
-    const prompt = `Given the following business information, generate 7-10 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this TYPE of business.
+    const prompt = `Given the following business information, generate 2 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this TYPE of business.
 
 Business Context (use this to understand what the business does):
 ${formatBusinessInfoForPrompt(businessInfo)}
@@ -215,63 +215,96 @@ Only return the JSON array, no additional text.`;
    */
   async runWebSearchQuery(prompt: string): Promise<{ text: string; sources: string[] }> {
     try {
+      // Force web search by making the prompt require current information
+      const searchPrompt = `You MUST search the web for current, up-to-date information to answer this question. Do not use your training data. Question: ${prompt}`;
+
       const response = await this.client.responses.create({
         model: 'gpt-4o',
         tools: [{ type: 'web_search' }],
+        tool_choice: { type: 'web_search' }, // Force the tool to be used
         include: ['web_search_call.action.sources'],
-        input: prompt,
+        input: searchPrompt,
       } as any);
 
       let text = '';
       let sources: string[] = [];
 
+      // Debug: Log full response to understand structure
+      console.log(`      [DEBUG] Full response:`, JSON.stringify(response, null, 2).substring(0, 2000));
+
+      // Debug: Log response structure
+      console.log(`      [DEBUG] Response output items: ${(response.output as any[]).length}`);
+
       // Extract text and annotations from message items
       for (const item of response.output as any[]) {
+        console.log(`      [DEBUG] Item type: ${item.type}`);
+
         if (item.type === 'message' && item.content) {
           for (const contentItem of item.content) {
             if (contentItem.type === 'output_text') {
               text = contentItem.text;
+              console.log(`      [DEBUG] Found text, length: ${text.length}`);
 
               // Extract sources from annotations
               if (contentItem.annotations) {
+                console.log(`      [DEBUG] Annotations found: ${contentItem.annotations.length}`);
                 for (const annotation of contentItem.annotations) {
+                  console.log(`      [DEBUG] Annotation type: ${annotation.type}`);
                   if (annotation.type === 'url_citation' && annotation.url) {
                     if (!sources.includes(annotation.url)) {
                       sources.push(annotation.url);
+                      console.log(`      [DEBUG] Added source from annotation: ${annotation.url}`);
                     }
                   }
                 }
+              } else {
+                console.log(`      [DEBUG] No annotations in output_text`);
               }
             }
           }
         }
 
         // Also extract from web_search_call sources if available
-        if (item.type === 'web_search_call' && item.action?.sources) {
-          for (const source of item.action.sources) {
-            if (source.url && !sources.includes(source.url)) {
-              sources.push(source.url);
+        if (item.type === 'web_search_call') {
+          console.log(`      [DEBUG] Found web_search_call`);
+          if (item.action?.sources) {
+            console.log(`      [DEBUG] web_search_call has ${item.action.sources.length} sources`);
+            for (const source of item.action.sources) {
+              if (source.url && !sources.includes(source.url)) {
+                sources.push(source.url);
+                console.log(`      [DEBUG] Added source from web_search_call: ${source.url}`);
+              }
             }
+          } else {
+            console.log(`      [DEBUG] web_search_call has no action.sources`);
+            console.log(`      [DEBUG] web_search_call structure:`, JSON.stringify(item, null, 2));
           }
         }
       }
 
+      console.log(`      [DEBUG] Final - Text length: ${text.length}, Sources count: ${sources.length}`);
+
       return { text, sources };
     } catch (error) {
       console.error('Web search query failed:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       return { text: '', sources: [] };
     }
   }
 
   /**
    * Analyze web search results with structured output
+   * Returns a SingleRunResult (not a full ChatGPTResponse)
    */
   async analyzeWebSearchResults(
     prompt: string,
     webSearchText: string,
     businessInfo: BusinessInfo,
     sources: string[]
-  ): Promise<ChatGPTResponse> {
+  ): Promise<SingleRunResult> {
     const analysisPrompt = `Analyze this web search result to determine if the business "${businessInfo.businessName}" was mentioned.
 
 Original Query: ${prompt}
@@ -314,7 +347,6 @@ Only return the JSON object, no additional text.`;
       const parsed = JSON.parse(content);
 
       return {
-        prompt,
         businessMentioned: parsed.businessMentioned || false,
         rank: parsed.rank || null,
         sources: sources, // Include ALL sources from web search
@@ -322,7 +354,6 @@ Only return the JSON object, no additional text.`;
     } catch (error) {
       console.error('Failed to analyze web search results:', error);
       return {
-        prompt,
         businessMentioned: false,
         rank: null,
         sources: sources, // Include ALL sources even on error
@@ -332,33 +363,83 @@ Only return the JSON object, no additional text.`;
 
   /**
    * Process a single customer prompt with web search and analysis
+   * Runs the prompt multiple times and calculates mention probability
    */
   async processCustomerPrompt(
     prompt: string,
-    businessInfo: BusinessInfo
+    businessInfo: BusinessInfo,
+    numRuns: number = 4
   ): Promise<ChatGPTResponse> {
-    console.log(`  Running web search for: "${prompt.substring(0, 60)}..."`);
+    console.log(`  Running web search for: "${prompt.substring(0, 60)}..." (${numRuns} times)`);
 
-    // Run web search
-    const { text, sources } = await this.runWebSearchQuery(prompt);
+    const runs: SingleRunResult[] = [];
+    const allSources = new Set<string>();
 
-    if (!text) {
-      console.log('    No results from web search');
-      return {
-        prompt,
-        businessMentioned: false,
-        rank: null,
-        sources: [],
-      };
+    // Run the prompt multiple times
+    for (let i = 0; i < numRuns; i++) {
+      console.log(`    Run ${i + 1}/${numRuns}...`);
+
+      // Run web search
+      const { text, sources } = await this.runWebSearchQuery(prompt);
+
+      if (!text) {
+        console.log(`      No results from web search on run ${i + 1}`);
+        runs.push({
+          businessMentioned: false,
+          rank: null,
+          sources: [],
+        });
+
+        // Small delay even on failure before next run
+        if (i < numRuns - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        continue;
+      }
+
+      console.log(`      Found ${sources.length} sources`);
+
+      // Analyze the results
+      const analysis = await this.analyzeWebSearchResults(prompt, text, businessInfo, sources);
+
+      // Store this run's result
+      runs.push({
+        businessMentioned: analysis.businessMentioned,
+        rank: analysis.rank,
+        sources: analysis.sources,
+      });
+
+      // Collect all unique sources
+      analysis.sources.forEach(source => allSources.add(source));
+
+      console.log(`      Analysis: ${analysis.businessMentioned ? `Mentioned (rank ${analysis.rank})` : 'Not mentioned'}`);
+
+      // Add delay between runs to avoid rate limits
+      if (i < numRuns - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
     }
 
-    console.log(`    Found ${sources.length} sources`);
+    // Calculate statistics
+    const mentionCount = runs.filter(run => run.businessMentioned).length;
+    const mentionProbability = (mentionCount / numRuns) * 100;
 
-    // Analyze the results
-    const analysis = await this.analyzeWebSearchResults(prompt, text, businessInfo, sources);
+    // Calculate average rank (only for runs where mentioned)
+    const mentionedRuns = runs.filter(run => run.businessMentioned && run.rank !== null);
+    const avgRank = mentionedRuns.length > 0
+      ? mentionedRuns.reduce((sum, run) => sum + (run.rank || 0), 0) / mentionedRuns.length
+      : null;
 
-    console.log(`    Analysis: ${analysis.businessMentioned ? `Mentioned (rank ${analysis.rank})` : 'Not mentioned'}`);
+    console.log(`  Overall: ${mentionCount}/${numRuns} mentions (${mentionProbability.toFixed(1)}%)`);
 
-    return analysis;
+    return {
+      prompt,
+      businessMentioned: mentionCount > 0,
+      rank: avgRank,
+      sources: Array.from(allSources),
+      mentionProbability,
+      runs,
+      totalRuns: numRuns,
+    };
   }
 }

@@ -26,11 +26,20 @@ export interface Recommendation {
   priority: number;
 }
 
+export interface SingleRunResult {
+  businessMentioned: boolean;
+  rank: number | null;
+  sources: string[];
+}
+
 export interface ChatGPTResponse {
   prompt: string;
-  businessMentioned: boolean;
-  rank: number | null; // null if not mentioned, 1-based if mentioned
-  sources: string[]; // URLs used in the response
+  businessMentioned: boolean; // Kept for backwards compatibility - true if mentioned at least once
+  rank: number | null; // Average rank across runs where mentioned
+  sources: string[]; // All unique sources from all runs
+  mentionProbability: number; // Percentage (0-100) of runs where business was mentioned
+  runs: SingleRunResult[]; // Individual run results
+  totalRuns: number; // Number of times the prompt was run
 }
 
 export interface Report {
