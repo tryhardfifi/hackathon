@@ -10,7 +10,6 @@ import {
   generateHTMLReport,
   generateTextReport,
 } from "./utils/reportGenerator";
-import { generateMockChatGPTResponses } from "./utils/mockDataGenerator";
 import { Report } from "./types";
 
 export class VisibilityReportAgent {
@@ -28,6 +27,44 @@ export class VisibilityReportAgent {
   }
 
   /**
+   * Get message with retry logic to handle race conditions
+   */
+  private async getMessageWithRetry(messageId: string, maxRetries: number): Promise<any> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Wait before attempting
+        if (attempt === 1) {
+          // Small initial delay to let the API index the message
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          // Exponential backoff for retries
+          const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
+          console.log(`  Retry ${attempt}/${maxRetries} after ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        const message = await this.agentMailService.getMessage(messageId);
+        return message;
+      } catch (error: any) {
+        lastError = error;
+
+        // If it's a 404, the message might not be indexed yet - retry
+        if (error.statusCode === 404 && attempt < maxRetries) {
+          console.log(`  Message not found yet (attempt ${attempt}/${maxRetries}), will retry...`);
+          continue;
+        }
+
+        // For other errors or last attempt, throw
+        throw error;
+      }
+    }
+
+    throw lastError || new Error('Failed to get message after retries');
+  }
+
+  /**
    * Process a single message by ID
    */
   async processMessageById(messageId: string): Promise<boolean> {
@@ -42,8 +79,8 @@ export class VisibilityReportAgent {
     try {
       console.log(`Processing message ${messageId}...`);
 
-      // Get the full message details
-      const message = await this.agentMailService.getMessage(messageId);
+      // Get the full message details with retry logic (for race conditions)
+      const message = await this.getMessageWithRetry(messageId, 3);
       console.log(`  Thread ID: ${message.thread_id}`);
       console.log(`  From: ${message.from}`);
       console.log(`  Subject: ${message.subject}`);
@@ -138,10 +175,15 @@ export class VisibilityReportAgent {
         visibilityAnalysis
       );
 
-      // Generate mock ChatGPT response data
-      const chatGPTResponses = generateMockChatGPTResponses(
-        businessInfo,
-        customerPrompts
+      // Process all customer prompts with real web search in parallel
+      console.log(`Processing ${customerPrompts.length} prompts with web search in parallel...`);
+      const chatGPTResponses = await Promise.all(
+        customerPrompts.map(customerPrompt =>
+          this.openAIService.processCustomerPrompt(
+            customerPrompt.prompt,
+            businessInfo
+          )
+        )
       );
 
       // Create report
