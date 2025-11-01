@@ -443,8 +443,7 @@ export function generateHTMLReport(report: Report): string {
     ${
       report.chatGPTResponses && report.chatGPTResponses.length > 0
         ? `
-    ${generateSourceMentionsChart(report.chatGPTResponses, report.businessName)}
-    ${generateSourceDomainPieChart(report.chatGPTResponses)}
+    ${generateSourceDomainBarChart(report.chatGPTResponses)}
 
     <h2>🎯 ChatGPT Response Analysis</h2>
     <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
@@ -727,9 +726,9 @@ function generateSourceMentionsChart(
 }
 
 /**
- * Generate source domain pie chart
+ * Generate source domain bar chart
  */
-function generateSourceDomainPieChart(responses: any[]): string {
+function generateSourceDomainBarChart(responses: any[]): string {
   // Extract all sources and group by top-level domain
   const domainCounts: Record<string, number> = {};
 
@@ -756,8 +755,8 @@ function generateSourceDomainPieChart(responses: any[]): string {
 
   if (Object.keys(domainCounts).length === 0) {
     return `
-    <div class="pie-chart-container">
-      <h2>🥧 Source Distribution by Domain</h2>
+    <div class="source-chart">
+      <h2>📊 Source Distribution by Domain</h2>
       <div class="source-chart-empty">No sources found in ChatGPT responses</div>
     </div>
     `;
@@ -766,51 +765,41 @@ function generateSourceDomainPieChart(responses: any[]): string {
   // Sort by count and take top domains
   const sortedDomains = Object.entries(domainCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 12); // Top 12 domains
+    .slice(0, 15); // Top 15 domains
 
-  const total = sortedDomains.reduce((sum, [, count]) => sum + count, 0);
+  const maxCount = sortedDomains[0][1];
 
-  // Color palette for pie chart segments
-  const colors = [
-    "#4285f4",
-    "#ea4335",
-    "#fbbc04",
-    "#34a853",
-    "#ff6d00",
-    "#9c27b0",
-    "#00acc1",
-    "#8bc34a",
-    "#ff5722",
-    "#607d8b",
-    "#795548",
-    "#3f51b5",
-  ];
+  const chartRows = sortedDomains
+    .map(([domain, count]) => {
+      // Calculate percentage based on the maximum count (so bars are proportional)
+      const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+      const displayDomain =
+        domain.length > 40 ? domain.substring(0, 37) + "..." : domain;
 
-  // Generate legend
-  const legendItems = sortedDomains
-    .map(([domain, count], index) => {
-      const percentage = ((count / total) * 100).toFixed(1);
-      const color = colors[index % colors.length];
+      // Ensure minimum width for visibility if count > 0
+      const barWidth = Math.max(percentage, count > 0 ? 2 : 0);
 
       return `
-      <div class="pie-legend-item">
-        <div class="pie-legend-color" style="background-color: ${color};"></div>
-        <div class="pie-legend-label">${escapeHTML(domain)}</div>
-        <div class="pie-legend-value">${count}</div>
-        <div class="pie-legend-percentage">${percentage}%</div>
+      <div class="source-chart-row">
+        <div class="source-chart-label">
+          ${escapeHTML(displayDomain)}
+        </div>
+        <div class="source-chart-bar-container">
+          <div class="source-chart-bar-container-inner">
+            <div class="source-chart-bar" style="width: ${barWidth}%;"></div>
+          </div>
+        </div>
+        <div class="source-chart-value">${count}</div>
       </div>
     `;
     })
     .join("");
 
   return `
-    <div class="pie-chart-container">
-      <h2>🥧 Source Distribution by Domain</h2>
+    <div class="source-chart">
+      <h2>📊 Source Distribution by Domain</h2>
       <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Top domains referenced across all ChatGPT responses:</p>
-      
-      <div class="pie-legend">
-        ${legendItems}
-      </div>
+      ${chartRows}
     </div>
   `;
 }
