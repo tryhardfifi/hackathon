@@ -149,4 +149,73 @@ export class AgentMailService {
   getMessageId(message: any): string {
     return message.message_id || message.messageId || message.id || '';
   }
+
+  /**
+   * Create a webhook for this inbox
+   */
+  async createWebhook(url: string, eventTypes?: string[]): Promise<any> {
+    try {
+      console.log(`Creating webhook for inbox ${this.inboxId}...`);
+      console.log(`  URL: ${url}`);
+      console.log(`  Event types: ${eventTypes?.join(', ') || 'all'}`);
+
+      const webhook = await this.client.webhooks.create({
+        url,
+        inboxIds: [this.inboxId],
+        eventTypes: eventTypes as any,
+      });
+
+      console.log(`✓ Webhook created successfully`);
+      console.log(`  Webhook ID: ${webhook.webhookId}`);
+      console.log(`  Secret: ${webhook.secret}`);
+
+      return webhook;
+    } catch (error) {
+      console.error('Error creating webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List all webhooks
+   */
+  async listWebhooks(): Promise<any[]> {
+    try {
+      const response = await this.client.webhooks.list();
+      return response.webhooks || [];
+    } catch (error) {
+      console.error('Error listing webhooks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a webhook by ID
+   */
+  async deleteWebhook(webhookId: string): Promise<void> {
+    try {
+      console.log(`Deleting webhook ${webhookId}...`);
+      await this.client.webhooks.delete(webhookId);
+      console.log(`✓ Webhook deleted successfully`);
+    } catch (error) {
+      console.error('Error deleting webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify webhook signature for security
+   */
+  verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
+  }
 }

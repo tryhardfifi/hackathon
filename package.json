@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/dev.ts",
     "dev-agent": "ts-node src/index.ts",
+    "dev-webhook": "ts-node src/webhook.ts",
     "watch": "tsc --watch",
     "send-mock-report": "ts-node src/scripts/sendMockReport.ts"
   },
@@ -20,9 +21,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ngrok/ngrok": "^1.5.2",
+    "@types/express": "^5.0.5",
     "agentmail": "^0.1.4",
     "browser-use-sdk": "^2.0.4",
     "dotenv": "^16.4.5",
+    "express": "^5.1.0",
     "openai": "^4.67.3",
     "ws": "^8.18.0",
     "zod": "^4.1.12"

@@ -1,0 +1,704 @@
+# Presence Report - Convex Data Storage Specification
+
+## Overview
+
+This specification defines how to store all data from our AI visibility report generation workflow in Convex. The system tracks how businesses appear in AI search results (GPT and Perplexity) over time.
+
+---
+
+## Data Model Structure
+
+```
+Company
+├── Reports (multiple reports over time)
+│   ├── Report Metadata
+│   ├── Prompts (questions tested)
+│   │   └── Search Results
+│   │       ├── GPT Results (4 runs per prompt)
+│   │       └── Perplexity Results (4 runs per prompt)
+│   ├── Competitors Found
+│   └── Source Citations
+└── Tracked Competitors (optional - for ongoing monitoring)
+```
+
+---
+
+## Convex Schema Definitions
+
+### 1. Companies Table
+
+Main entity - represents a business being analyzed.
+
+```typescript
+companies: defineTable({
+  name: v.string(),                    // "Acme Inc"
+  description: v.string(),             // "Enterprise project management software"
+  url: v.string(),                     // "https://acme-inc.com"
+  industry: v.string(),                // "SaaS", "E-commerce", etc.
+  productsServices: v.string(),        // What they offer
+  targetCustomers: v.string(),         // Who they serve
+  location: v.optional(v.string()),    // "Portland, OR"
+  additionalContext: v.optional(v.string()),
+  createdAt: v.number(),               // timestamp
+  updatedAt: v.number(),
+})
+.index("by_url", ["url"])
+.index("by_creation", ["createdAt"])
+```
+
+**Purpose**: Store business information extracted from website
+
+**Created by**: GPTBusinessExtractor or BrowserUseService
+
+---
+
+### 2. Reports Table
+
+A report represents a complete visibility analysis run at a specific point in time.
+
+```typescript
+reports: defineTable({
+  companyId: v.id("companies"),              // Parent company
+  generatedDate: v.number(),                  // timestamp
+  status: v.union(
+    v.literal("generating"),
+    v.literal("completed"),
+    v.literal("failed")
+  ),
+
+  // Configuration
+  totalPrompts: v.number(),                   // How many prompts tested (e.g., 2)
+  runsPerPrompt: v.number(),                  // Runs per prompt (default: 4)
+
+  // GPT Results Summary
+  gptVisibilityScore: v.optional(v.number()),      // 0-100
+  gptQueryCoverage: v.optional(v.number()),        // Percentage
+  gptMentionRate: v.optional(v.number()),          // Percentage
+  gptAverageRank: v.optional(v.number()),          // Average position when mentioned
+
+  // Perplexity Results Summary
+  perplexityVisibilityScore: v.optional(v.number()),
+  perplexityQueryCoverage: v.optional(v.number()),
+  perplexityMentionRate: v.optional(v.number()),
+  perplexityAverageRank: v.optional(v.number()),
+
+  // Metadata
+  executionTimeMs: v.optional(v.number()),    // How long it took
+  errorMessage: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+.index("by_company", ["companyId"])
+.index("by_date", ["companyId", "generatedDate"])
+.index("by_status", ["status"])
+```
+
+**Purpose**: Track each report generation with summary statistics
+
+**Created by**: dev.ts after completing all searches
+
+---
+
+### 3. Prompts Table
+
+Customer prompts tested in a report - generic queries that potential customers might ask.
+
+```typescript
+prompts: defineTable({
+  companyId: v.id("companies"),
+  reportId: v.id("reports"),
+
+  promptText: v.string(),                     // "What are the best project management tools?"
+  category: v.string(),                       // "Finding a business", "Comparing options", etc.
+  orderIndex: v.number(),                     // 1, 2, 3... for display order
+
+  // GPT Aggregated Results
+  gptBusinessMentioned: v.boolean(),          // Mentioned in at least 1 run
+  gptMentionProbability: v.number(),          // 0-100 percentage
+  gptAverageRank: v.optional(v.number()),     // Average rank when mentioned
+  gptTotalSources: v.number(),                // Count of unique sources
+
+  // Perplexity Aggregated Results
+  perplexityBusinessMentioned: v.boolean(),
+  perplexityMentionProbability: v.number(),
+  perplexityAverageRank: v.optional(v.number()),
+  perplexityTotalSources: v.number(),
+
+  createdAt: v.number(),
+})
+.index("by_report", ["reportId"])
+.index("by_company", ["companyId"])
+```
+
+**Purpose**: Store each customer prompt and aggregated results
+
+**Created by**: OpenAIService.generateCustomerPrompts()
+
+---
+
+### 4. Prompt Runs Table
+
+Individual search executions - each prompt is run 4 times per AI service.
+
+```typescript
+promptRuns: defineTable({
+  companyId: v.id("companies"),
+  reportId: v.id("reports"),
+  promptId: v.id("prompts"),
+
+  aiService: v.union(
+    v.literal("gpt"),
+    v.literal("perplexity")
+  ),
+  runNumber: v.number(),                      // 1-4
+
+  // Search Result
+  responseText: v.string(),                   // Full AI response
+  businessMentioned: v.boolean(),             // Was our company mentioned?
+  rank: v.optional(v.number()),               // Position if mentioned (1, 2, 3...)
+  mentionContext: v.optional(v.string()),     // Text snippet of mention
+
+  // Metadata
+  executionTimeMs: v.number(),
+  tokensUsed: v.optional(v.number()),
+  createdAt: v.number(),
+})
+.index("by_prompt", ["promptId"])
+.index("by_report", ["reportId"])
+.index("by_service", ["aiService", "promptId"])
+```
+
+**Purpose**: Store each individual search run result
+
+**Created by**:
+- OpenAIService.processCustomerPrompt() for GPT
+- PerplexityService.processCustomerPrompt() for Perplexity
+
+---
+
+### 5. Competitor Mentions Table
+
+Tracks competitor appearances in search results.
+
+```typescript
+competitorMentions: defineTable({
+  companyId: v.id("companies"),
+  reportId: v.id("reports"),
+  promptId: v.id("prompts"),
+  promptRunId: v.id("promptRuns"),
+
+  competitorName: v.string(),                 // "Asana", "Monday.com", etc.
+  rank: v.number(),                           // Position in response (1, 2, 3...)
+  sourceUrl: v.optional(v.string()),          // URL where competitor was found
+  mentionContext: v.optional(v.string()),     // Text snippet
+
+  aiService: v.union(
+    v.literal("gpt"),
+    v.literal("perplexity")
+  ),
+
+  createdAt: v.number(),
+})
+.index("by_run", ["promptRunId"])
+.index("by_prompt", ["promptId"])
+.index("by_report", ["reportId"])
+.index("by_competitor", ["reportId", "competitorName"])
+```
+
+**Purpose**: Track which competitors appear in which searches
+
+**Created by**: Analysis phase in OpenAI/Perplexity services
+
+---
+
+### 6. Source Citations Table
+
+URLs and sources cited in AI responses.
+
+```typescript
+sourceCitations: defineTable({
+  companyId: v.id("companies"),
+  reportId: v.id("reports"),
+  promptRunId: v.id("promptRuns"),
+
+  sourceUrl: v.string(),                      // "https://example.com/article"
+  sourceDomain: v.string(),                   // "example.com"
+  sourceTitle: v.optional(v.string()),        // Page title if available
+
+  aiService: v.union(
+    v.literal("gpt"),
+    v.literal("perplexity")
+  ),
+
+  // Analysis
+  mentionedOurCompany: v.boolean(),           // Did this source lead to our mention?
+  mentionedCompetitors: v.array(v.string()),  // ["Asana", "Monday.com"]
+
+  createdAt: v.number(),
+})
+.index("by_run", ["promptRunId"])
+.index("by_report", ["reportId"])
+.index("by_domain", ["reportId", "sourceDomain"])
+.index("by_service", ["reportId", "aiService"])
+```
+
+**Purpose**: Track which sources influence AI recommendations
+
+**Created by**: Extracted from search results in both services
+
+---
+
+### 7. Tracked Competitors Table (Optional)
+
+Companies can track specific competitors over time.
+
+```typescript
+trackedCompetitors: defineTable({
+  companyId: v.id("companies"),               // Who is tracking
+  competitorName: v.string(),                 // "Asana"
+  competitorUrl: v.optional(v.string()),      // "https://asana.com"
+  competitorDescription: v.optional(v.string()),
+
+  isActive: v.boolean(),                      // Still tracking?
+  addedDate: v.number(),
+
+  // Aggregated stats (updated per report)
+  totalMentions: v.number(),                  // Across all reports
+  averageMentionRate: v.number(),             // Percentage
+  lastSeenInReport: v.optional(v.id("reports")),
+})
+.index("by_company", ["companyId"])
+.index("by_active", ["companyId", "isActive"])
+```
+
+**Purpose**: Track specific competitors across multiple reports
+
+**Created by**: User manually adds, or auto-detected from mentions
+
+---
+
+## Data Flow: Report Generation → Convex Storage
+
+### Step 1: Create Company Record
+```typescript
+const companyId = await ctx.db.insert("companies", {
+  name: businessInfo.businessName,
+  description: businessInfo.productsServices,
+  url: businessInfo.website,
+  industry: businessInfo.industry,
+  productsServices: businessInfo.productsServices,
+  targetCustomers: businessInfo.targetCustomers,
+  location: businessInfo.location,
+  additionalContext: businessInfo.additionalContext,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+});
+```
+
+### Step 2: Create Report Record
+```typescript
+const reportId = await ctx.db.insert("reports", {
+  companyId,
+  generatedDate: Date.now(),
+  status: "generating",
+  totalPrompts: customerPrompts.length,
+  runsPerPrompt: 4,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+});
+```
+
+### Step 3: Create Prompt Records
+```typescript
+for (const customerPrompt of customerPrompts) {
+  const promptId = await ctx.db.insert("prompts", {
+    companyId,
+    reportId,
+    promptText: customerPrompt.prompt,
+    category: customerPrompt.category,
+    orderIndex: index,
+    gptBusinessMentioned: false,
+    gptMentionProbability: 0,
+    gptTotalSources: 0,
+    perplexityBusinessMentioned: false,
+    perplexityMentionProbability: 0,
+    perplexityTotalSources: 0,
+    createdAt: Date.now(),
+  });
+}
+```
+
+### Step 4: Store Search Results (per run)
+```typescript
+// For each of 4 GPT runs and 4 Perplexity runs
+const promptRunId = await ctx.db.insert("promptRuns", {
+  companyId,
+  reportId,
+  promptId,
+  aiService: "gpt", // or "perplexity"
+  runNumber: 1, // 1-4
+  responseText: response.text,
+  businessMentioned: analysis.businessMentioned,
+  rank: analysis.rank,
+  mentionContext: analysis.mentionContext,
+  executionTimeMs: duration,
+  tokensUsed: response.usage?.total_tokens,
+  createdAt: Date.now(),
+});
+```
+
+### Step 5: Store Competitor Mentions
+```typescript
+for (const competitor of analysis.competitors) {
+  await ctx.db.insert("competitorMentions", {
+    companyId,
+    reportId,
+    promptId,
+    promptRunId,
+    competitorName: competitor.name,
+    rank: competitor.rank,
+    sourceUrl: competitor.sourceUrl,
+    aiService: "gpt", // or "perplexity"
+    createdAt: Date.now(),
+  });
+}
+```
+
+### Step 6: Store Source Citations
+```typescript
+for (const source of response.sources) {
+  await ctx.db.insert("sourceCitations", {
+    companyId,
+    reportId,
+    promptRunId,
+    sourceUrl: source,
+    sourceDomain: extractDomain(source),
+    aiService: "gpt", // or "perplexity"
+    mentionedOurCompany: analysis.businessMentioned,
+    mentionedCompetitors: analysis.competitors.map(c => c.name),
+    createdAt: Date.now(),
+  });
+}
+```
+
+### Step 7: Update Report Summary
+```typescript
+// After all searches complete
+await ctx.db.patch(reportId, {
+  status: "completed",
+  gptVisibilityScore: calculateVisibilityScore(gptResults),
+  gptQueryCoverage: calculateCoverage(gptResults),
+  gptMentionRate: calculateMentionRate(gptResults),
+  gptAverageRank: calculateAverageRank(gptResults),
+  perplexityVisibilityScore: calculateVisibilityScore(perplexityResults),
+  perplexityQueryCoverage: calculateCoverage(perplexityResults),
+  perplexityMentionRate: calculateMentionRate(perplexityResults),
+  perplexityAverageRank: calculateAverageRank(perplexityResults),
+  executionTimeMs: totalDuration,
+  updatedAt: Date.now(),
+});
+```
+
+---
+
+## Convex Queries & Mutations
+
+### Key Queries Needed
+
+```typescript
+// Get company with latest report
+export const getCompanyWithLatestReport = query({
+  args: { companyId: v.id("companies") },
+  handler: async (ctx, args) => {
+    const company = await ctx.db.get(args.companyId);
+    const latestReport = await ctx.db
+      .query("reports")
+      .withIndex("by_company", (q) => q.eq("companyId", args.companyId))
+      .order("desc")
+      .first();
+    return { company, latestReport };
+  },
+});
+
+// Get full report with all data
+export const getFullReport = query({
+  args: { reportId: v.id("reports") },
+  handler: async (ctx, args) => {
+    const report = await ctx.db.get(args.reportId);
+    const prompts = await ctx.db
+      .query("prompts")
+      .withIndex("by_report", (q) => q.eq("reportId", args.reportId))
+      .collect();
+
+    // For each prompt, get runs, competitors, sources
+    const fullPrompts = await Promise.all(
+      prompts.map(async (prompt) => {
+        const runs = await ctx.db
+          .query("promptRuns")
+          .withIndex("by_prompt", (q) => q.eq("promptId", prompt._id))
+          .collect();
+
+        const competitors = await ctx.db
+          .query("competitorMentions")
+          .withIndex("by_prompt", (q) => q.eq("promptId", prompt._id))
+          .collect();
+
+        return { ...prompt, runs, competitors };
+      })
+    );
+
+    return { ...report, prompts: fullPrompts };
+  },
+});
+
+// Get competitor performance across report
+export const getCompetitorStats = query({
+  args: { reportId: v.id("reports") },
+  handler: async (ctx, args) => {
+    const mentions = await ctx.db
+      .query("competitorMentions")
+      .withIndex("by_report", (q) => q.eq("reportId", args.reportId))
+      .collect();
+
+    // Aggregate by competitor name
+    const stats = {};
+    for (const mention of mentions) {
+      if (!stats[mention.competitorName]) {
+        stats[mention.competitorName] = {
+          totalMentions: 0,
+          ranks: [],
+          sources: new Set(),
+        };
+      }
+      stats[mention.competitorName].totalMentions++;
+      stats[mention.competitorName].ranks.push(mention.rank);
+      if (mention.sourceUrl) {
+        stats[mention.competitorName].sources.add(mention.sourceUrl);
+      }
+    }
+
+    return stats;
+  },
+});
+
+// Get top sources for report
+export const getTopSources = query({
+  args: { reportId: v.id("reports"), aiService: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    let query = ctx.db
+      .query("sourceCitations")
+      .withIndex("by_report", (q) => q.eq("reportId", args.reportId));
+
+    const sources = await query.collect();
+
+    // Filter by AI service if specified
+    const filtered = args.aiService
+      ? sources.filter(s => s.aiService === args.aiService)
+      : sources;
+
+    // Aggregate by domain
+    const domainCounts = {};
+    for (const source of filtered) {
+      domainCounts[source.sourceDomain] =
+        (domainCounts[source.sourceDomain] || 0) + 1;
+    }
+
+    return Object.entries(domainCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15);
+  },
+});
+```
+
+### Key Mutations Needed
+
+```typescript
+// Create new report
+export const createReport = mutation({
+  args: {
+    companyId: v.id("companies"),
+    totalPrompts: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("reports", {
+      companyId: args.companyId,
+      generatedDate: Date.now(),
+      status: "generating",
+      totalPrompts: args.totalPrompts,
+      runsPerPrompt: 4,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Update report status and stats
+export const updateReportResults = mutation({
+  args: {
+    reportId: v.id("reports"),
+    results: v.object({
+      gptVisibilityScore: v.number(),
+      gptQueryCoverage: v.number(),
+      gptMentionRate: v.number(),
+      gptAverageRank: v.optional(v.number()),
+      perplexityVisibilityScore: v.number(),
+      perplexityQueryCoverage: v.number(),
+      perplexityMentionRate: v.number(),
+      perplexityAverageRank: v.optional(v.number()),
+      executionTimeMs: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.reportId, {
+      status: "completed",
+      ...args.results,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Batch insert prompt runs (for performance)
+export const insertPromptRuns = mutation({
+  args: {
+    runs: v.array(v.object({
+      companyId: v.id("companies"),
+      reportId: v.id("reports"),
+      promptId: v.id("prompts"),
+      aiService: v.union(v.literal("gpt"), v.literal("perplexity")),
+      runNumber: v.number(),
+      responseText: v.string(),
+      businessMentioned: v.boolean(),
+      rank: v.optional(v.number()),
+      executionTimeMs: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const ids = [];
+    for (const run of args.runs) {
+      const id = await ctx.db.insert("promptRuns", {
+        ...run,
+        createdAt: Date.now(),
+      });
+      ids.push(id);
+    }
+    return ids;
+  },
+});
+```
+
+---
+
+## Example: Complete Report in Convex
+
+After running a report, the data structure looks like:
+
+```
+Company: "Acme Inc" (ID: abc123)
+└── Report (ID: rep456) - Jan 1, 2025
+    ├── Status: completed
+    ├── GPT Summary: 67/100 visibility, 45% mention rate
+    ├── Perplexity Summary: 52/100 visibility, 35% mention rate
+    │
+    ├── Prompt 1: "What are the best project management tools?"
+    │   ├── GPT Run 1: Not mentioned
+    │   │   ├── Competitors: [Asana (rank 1), Monday.com (rank 2)]
+    │   │   └── Sources: [g2.com, capterra.com]
+    │   ├── GPT Run 2: Mentioned (rank 3)
+    │   │   ├── Competitors: [Asana (rank 1), Monday.com (rank 2)]
+    │   │   └── Sources: [techcrunch.com, producthunt.com]
+    │   ├── GPT Run 3: Not mentioned
+    │   ├── GPT Run 4: Mentioned (rank 2)
+    │   ├── Perplexity Run 1: Not mentioned
+    │   ├── Perplexity Run 2: Not mentioned
+    │   ├── Perplexity Run 3: Mentioned (rank 1)
+    │   └── Perplexity Run 4: Not mentioned
+    │
+    └── Prompt 2: "Tools with gantt chart features"
+        ├── GPT Run 1-4: [similar structure]
+        └── Perplexity Run 1-4: [similar structure]
+```
+
+---
+
+## Migration from Current System
+
+### Current: Files → Convex
+
+**Currently saving**:
+- HTML report → `./reports/report-{slug}-{timestamp}.html`
+- Text report → `./reports/report-{slug}-{timestamp}.txt`
+- Debug logs → `./debug-logs/`
+
+**New approach**:
+1. Save all data to Convex (structured, queryable)
+2. Generate HTML/text reports on-demand from Convex data
+3. Keep file exports as optional download feature
+4. Enable historical tracking and comparisons
+
+### Benefits of Convex Storage
+
+1. **Queryable**: Filter by date range, competitor, source domain
+2. **Real-time**: Dashboard updates as report generates
+3. **Historical**: Track visibility changes over time
+4. **Shareable**: Multiple users can view same report
+5. **Exportable**: Generate PDF/HTML/CSV from any report
+6. **Analyzable**: Run aggregate queries across multiple reports
+
+---
+
+## Next Steps: Implementation
+
+### Phase 1: Schema Setup
+```bash
+# In convex/schema.ts
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  companies: defineTable({ ... }),
+  reports: defineTable({ ... }),
+  prompts: defineTable({ ... }),
+  promptRuns: defineTable({ ... }),
+  competitorMentions: defineTable({ ... }),
+  sourceCitations: defineTable({ ... }),
+  trackedCompetitors: defineTable({ ... }),
+});
+```
+
+### Phase 2: Integration
+Modify `src/dev.ts` to:
+1. Connect to Convex client
+2. Create company record
+3. Create report record
+4. Store each search result as it completes
+5. Update report summary at end
+
+### Phase 3: Query Layer
+Create Convex functions to:
+1. Retrieve full report data
+2. Calculate on-the-fly metrics
+3. Generate comparison views
+4. Export to various formats
+
+### Phase 4: UI (Future)
+Build Next.js dashboard to:
+1. View all companies
+2. Browse report history
+3. Interactive charts
+4. Competitor tracking
+5. Trend analysis
+
+---
+
+## Summary
+
+This specification transforms the report generation workflow from **file-based outputs** to a **structured database model** in Convex. Every search run, competitor mention, and source citation is tracked, enabling:
+
+- 📊 **Historical tracking** of visibility over time
+- 🔍 **Deep analysis** of competitor performance
+- 📈 **Trend identification** across reports
+- 🎯 **Targeted insights** on what improves visibility
+- 🤝 **Collaborative access** to reports
+- 🚀 **Real-time updates** during report generation
+
+The schema is designed to be **query-efficient** with proper indexes and **scalable** for tracking hundreds of companies and thousands of reports.

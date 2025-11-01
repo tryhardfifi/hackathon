@@ -1,6 +1,12 @@
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-dotenv.config();
+// Load .env.local first (takes precedence), then .env as fallback
+const envLocalPath = path.resolve(process.cwd(), '.env.local');
+const envPath = path.resolve(process.cwd(), '.env');
+
+dotenv.config({ path: envLocalPath });
+dotenv.config({ path: envPath });
 
 export const config = {
   agentmail: {
