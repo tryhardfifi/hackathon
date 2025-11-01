@@ -85,14 +85,50 @@ export function generateMockChatGPTResponses(
              Math.random() < 0.9 ? 4 : 5;
     }
 
+    // Generate business-specific sources (blog posts, pages, etc.)
+    const businessSources: string[] = [];
+    if (businessInfo.website) {
+      const baseUrl = businessInfo.website.replace(/\/$/, ''); // Remove trailing slash
+      // Create some realistic blog post URLs based on industry
+      if (industry.includes('coffee')) {
+        businessSources.push(
+          `${baseUrl}/blog/top-10-coffee-roasters-in-portland`,
+          `${baseUrl}/guide/sustainable-coffee-sourcing`,
+          `${baseUrl}/blog/best-direct-trade-beans`,
+          `${baseUrl}/about/our-roasting-process`,
+          `${baseUrl}/blog/how-to-brew-specialty-coffee`
+        );
+      } else if (industry.includes('restaurant')) {
+        businessSources.push(
+          `${baseUrl}/menu`,
+          `${baseUrl}/blog/restaurant-reviews`,
+          `${baseUrl}/about/chef-story`,
+          `${baseUrl}/events`
+        );
+      } else {
+        // Generic business pages
+        businessSources.push(
+          `${baseUrl}/blog`,
+          `${baseUrl}/about`,
+          `${baseUrl}/services`,
+          `${baseUrl}/resources/guide`
+        );
+      }
+    }
+
     // Select 2-4 random sources for each response
     const numSources = Math.floor(Math.random() * 3) + 2; // 2-4 sources
-    const shuffled = [...defaultSources].sort(() => 0.5 - Math.random());
-    const sources = shuffled.slice(0, numSources);
+    const allSources = [...defaultSources, ...businessSources];
+    const shuffled = [...allSources].sort(() => 0.5 - Math.random());
+    let sources = shuffled.slice(0, numSources);
 
-    // Add some variation: sometimes include business website if mentioned
-    if (businessMentioned && businessInfo.website) {
-      sources[0] = businessInfo.website;
+    // If business is mentioned, increase chance of including business sources
+    if (businessMentioned && businessSources.length > 0) {
+      // Replace one random source with a business source 70% of the time
+      if (Math.random() < 0.7) {
+        const randomBusinessSource = businessSources[Math.floor(Math.random() * businessSources.length)];
+        sources[Math.floor(Math.random() * sources.length)] = randomBusinessSource;
+      }
     }
 
     return {

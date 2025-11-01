@@ -222,6 +222,167 @@ export function generateHTMLReport(report: Report): string {
       letter-spacing: 0.5px;
       font-weight: 500;
     }
+    .source-chart {
+      margin: 40px 0;
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 25px;
+    }
+    .source-chart h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #2c3e50;
+      font-size: 20px;
+    }
+    .source-chart-row {
+      margin-bottom: 15px;
+      display: table;
+      width: 100%;
+    }
+    .source-chart-label {
+      display: table-cell;
+      vertical-align: middle;
+      width: 40%;
+      font-size: 13px;
+      color: #333;
+      padding-right: 15px;
+      word-break: break-word;
+    }
+    .source-chart-bar-container {
+      display: table-cell;
+      vertical-align: middle;
+      width: 50%;
+      padding-right: 10px;
+    }
+    .source-chart-bar-container-inner {
+      width: 100%;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      height: 24px;
+      position: relative;
+    }
+    .source-chart-bar {
+      height: 24px;
+      background-color: #4285f4;
+      border-radius: 4px;
+      min-width: 2px;
+    }
+    .source-chart-value {
+      display: table-cell;
+      vertical-align: middle;
+      width: 10%;
+      text-align: right;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    .source-chart-empty {
+      color: #999;
+      font-style: italic;
+      padding: 20px;
+      text-align: center;
+    }
+    .pie-chart-container {
+      margin: 40px 0;
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 25px;
+    }
+    .pie-chart-container h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #2c3e50;
+      font-size: 20px;
+    }
+    .pie-chart-visual {
+      display: table;
+      width: 100%;
+      margin: 20px 0;
+      height: 120px;
+    }
+    .pie-segment {
+      display: table-cell;
+      vertical-align: bottom;
+      text-align: center;
+      padding: 5px;
+      width: 12.5%;
+      height: 120px;
+    }
+    .pie-segment-box-container {
+      height: 100px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: 5px;
+      position: relative;
+    }
+    .pie-segment-box {
+      width: 35px;
+      border-radius: 4px 4px 0 0;
+      margin: 0 auto;
+      min-height: 10px;
+      position: relative;
+      bottom: 0;
+    }
+    .pie-segment-label {
+      font-size: 11px;
+      color: #666;
+      word-break: break-word;
+      max-width: 80px;
+      margin: 0 auto;
+    }
+    .pie-segment-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+      margin-top: 3px;
+    }
+    .pie-legend {
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .pie-legend-item {
+      display: table;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 8px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+    }
+    .pie-legend-color {
+      display: table-cell;
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      vertical-align: middle;
+    }
+    .pie-legend-label {
+      display: table-cell;
+      vertical-align: middle;
+      padding-left: 10px;
+      font-size: 13px;
+      color: #333;
+    }
+    .pie-legend-value {
+      display: table-cell;
+      vertical-align: middle;
+      text-align: right;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    .pie-legend-percentage {
+      display: table-cell;
+      vertical-align: middle;
+      text-align: right;
+      padding-left: 10px;
+      font-size: 12px;
+      color: #666;
+      width: 60px;
+    }
   </style>
 </head>
 <body>
@@ -235,6 +396,9 @@ export function generateHTMLReport(report: Report): string {
     ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? generateResponseSummary(report.chatGPTResponses) : ''}
 
     ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? `
+    ${generateSourceMentionsChart(report.chatGPTResponses, report.businessName)}
+    ${generateSourceDomainPieChart(report.chatGPTResponses)}
+    
     <h2>🎯 ChatGPT Response Analysis</h2>
     <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
     
@@ -447,6 +611,190 @@ function generateResponseSummary(responses: any[]): string {
         </td>
       </tr>
     </table>
+  `;
+}
+
+/**
+ * Generate source mentions bar chart
+ */
+function generateSourceMentionsChart(responses: any[], businessName: string): string {
+  // Extract all sources and count mentions
+  const sourceCounts: Record<string, number> = {};
+  
+  // Count all sources
+  responses.forEach(response => {
+    if (response.sources && Array.isArray(response.sources)) {
+      response.sources.forEach((source: string) => {
+        if (source) {
+          sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        }
+      });
+    }
+  });
+  
+  // Extract business domain from sources (look for patterns like /blog/, /guide/, /about/)
+  // Business sources typically have paths like /blog/..., /guide/..., etc.
+  let businessDomains: string[] = [];
+  const allSources = Object.keys(sourceCounts);
+  
+  // Find potential business domains by looking for sources with blog/guide/about paths
+  allSources.forEach(source => {
+    if (source.includes('/blog/') || source.includes('/guide/') || 
+        source.includes('/about/') || source.includes('/resources/')) {
+      try {
+        const url = new URL(source);
+        if (!businessDomains.includes(url.hostname)) {
+          businessDomains.push(url.hostname);
+        }
+      } catch (e) {
+        const match = source.match(/https?:\/\/([^\/]+)/);
+        if (match && !businessDomains.includes(match[1])) {
+          businessDomains.push(match[1]);
+        }
+      }
+    }
+  });
+  
+  // Filter to only business sources (those with business domain or blog/guide paths)
+  const businessSources = Object.entries(sourceCounts)
+    .filter(([source]) => {
+      // Check if source has business-like paths
+      if (source.includes('/blog/') || source.includes('/guide/') || 
+          source.includes('/about/') || source.includes('/resources/')) {
+        // Make sure it's not a common third-party domain
+        const commonDomains = ['youtube.com', 'facebook.com', 'twitter.com', 
+                               'instagram.com', 'linkedin.com', 'reddit.com',
+                               'medium.com', 'wikipedia.org', 'amazon.com'];
+        try {
+          const url = new URL(source);
+          return !commonDomains.some(domain => url.hostname.includes(domain));
+        } catch (e) {
+          return true; // If we can't parse, include it if it has business-like paths
+        }
+      }
+      return false;
+    })
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10); // Top 10 sources
+  
+  if (businessSources.length === 0) {
+    return `
+    <div class="source-chart">
+      <h2>📈 Top Mentioned Sources</h2>
+      <div class="source-chart-empty">No business sources found in ChatGPT responses</div>
+    </div>
+    `;
+  }
+  
+  const maxCount = businessSources[0][1];
+  
+  const chartRows = businessSources.map(([source, count]) => {
+    // Calculate percentage based on the maximum count (so bars are proportional)
+    const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+    const displaySource = source.length > 60 ? source.substring(0, 57) + '...' : source;
+    
+    // Ensure minimum width for visibility if count > 0
+    const barWidth = Math.max(percentage, count > 0 ? 2 : 0);
+    
+    return `
+      <div class="source-chart-row">
+        <div class="source-chart-label">
+          <a href="${escapeHTML(source)}" style="color: #4285f4; text-decoration: none;" target="_blank">${escapeHTML(displaySource)}</a>
+        </div>
+        <div class="source-chart-bar-container">
+          <div class="source-chart-bar-container-inner">
+            <div class="source-chart-bar" style="width: ${barWidth}%;"></div>
+          </div>
+        </div>
+        <div class="source-chart-value">${count}</div>
+      </div>
+    `;
+  }).join('');
+  
+  return `
+    <div class="source-chart">
+      <h2>📈 Top Mentioned Sources</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Your most referenced content in ChatGPT responses:</p>
+      ${chartRows}
+    </div>
+  `;
+}
+
+/**
+ * Generate source domain pie chart
+ */
+function generateSourceDomainPieChart(responses: any[]): string {
+  // Extract all sources and group by top-level domain
+  const domainCounts: Record<string, number> = {};
+  
+  responses.forEach(response => {
+    if (response.sources && Array.isArray(response.sources)) {
+      response.sources.forEach((source: string) => {
+        if (source) {
+          try {
+            const url = new URL(source);
+            const domain = url.hostname.replace(/^www\./, ''); // Remove www prefix
+            domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+          } catch (e) {
+            // If URL parsing fails, try manual extraction
+            const match = source.match(/https?:\/\/(?:www\.)?([^\/]+)/);
+            if (match) {
+              const domain = match[1];
+              domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  if (Object.keys(domainCounts).length === 0) {
+    return `
+    <div class="pie-chart-container">
+      <h2>🥧 Source Distribution by Domain</h2>
+      <div class="source-chart-empty">No sources found in ChatGPT responses</div>
+    </div>
+    `;
+  }
+  
+  // Sort by count and take top domains
+  const sortedDomains = Object.entries(domainCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12); // Top 12 domains
+  
+  const total = sortedDomains.reduce((sum, [, count]) => sum + count, 0);
+  
+  // Color palette for pie chart segments
+  const colors = [
+    '#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d00',
+    '#9c27b0', '#00acc1', '#8bc34a', '#ff5722', '#607d8b',
+    '#795548', '#3f51b5'
+  ];
+  
+  // Generate legend
+  const legendItems = sortedDomains.map(([domain, count], index) => {
+    const percentage = ((count / total) * 100).toFixed(1);
+    const color = colors[index % colors.length];
+    
+    return `
+      <div class="pie-legend-item">
+        <div class="pie-legend-color" style="background-color: ${color};"></div>
+        <div class="pie-legend-label">${escapeHTML(domain)}</div>
+        <div class="pie-legend-value">${count}</div>
+        <div class="pie-legend-percentage">${percentage}%</div>
+      </div>
+    `;
+  }).join('');
+  
+  return `
+    <div class="pie-chart-container">
+      <h2>🥧 Source Distribution by Domain</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 20px;">Top domains referenced across all ChatGPT responses:</p>
+      
+      <div class="pie-legend">
+        ${legendItems}
+      </div>
+    </div>
   `;
 }
 
