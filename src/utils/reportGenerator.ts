@@ -244,7 +244,7 @@ export function generateHTMLReport(report: Report): string {
       padding: 20px;
       border-radius: 8px;
       text-align: center;
-      width: 20%;
+      width: 25%;
     }
     .stat-emoji {
       font-size: 32px;
@@ -589,7 +589,7 @@ function groupPromptsByCategory(
 function generateResponseSummary(responses: any[]): string {
   const mentionedCount = responses.filter((r) => r.businessMentioned).length;
   const totalResponses = responses.length;
-  const mentionPercentage =
+  const promptCoverage =
     totalResponses > 0
       ? Math.round((mentionedCount / totalResponses) * 100)
       : 0;
@@ -604,22 +604,30 @@ function generateResponseSummary(responses: any[]): string {
         ) / 10
       : null;
 
-  const topRankCount = mentionedResponses.filter((r) => r.rank === 1).length;
-
   // Calculate average mention probability across all prompts
   const avgProbability = responses.length > 0
     ? Math.round(responses.reduce((sum, r) => sum + (r.mentionProbability || 0), 0) / responses.length)
     : 0;
 
-  // Calculate total runs
-  const totalRuns = responses.reduce((sum, r) => sum + (r.totalRuns || 1), 0);
+  // Calculate visibility score: prompt coverage × avg probability × (1/avg rank)
+  // Convert rank to a score where #1 = 1.0, #2 = 0.5, #3 = 0.33, etc.
+  let visibilityScore = 0;
+  if (avgRank && avgRank > 0) {
+    const rankScore = 1 / avgRank;
+    visibilityScore = Math.round((promptCoverage / 100) * (avgProbability / 100) * rankScore * 100);
+  }
 
   return `
     <table class="stats-summary" cellpadding="0" cellspacing="0" border="0">
       <tr>
         <td class="stat-item">
+          <span class="stat-emoji">⭐</span>
+          <div class="stat-value">${visibilityScore}</div>
+          <div class="stat-label">Visibility Score</div>
+        </td>
+        <td class="stat-item">
           <span class="stat-emoji">📊</span>
-          <div class="stat-value">${mentionPercentage}%</div>
+          <div class="stat-value">${promptCoverage}%</div>
           <div class="stat-label">Prompt Coverage</div>
         </td>
         <td class="stat-item">
@@ -628,21 +636,11 @@ function generateResponseSummary(responses: any[]): string {
           <div class="stat-label">Avg Probability</div>
         </td>
         <td class="stat-item">
-          <span class="stat-emoji">🔄</span>
-          <div class="stat-value">${totalRuns}</div>
-          <div class="stat-label">Total Runs</div>
-        </td>
-        <td class="stat-item">
           <span class="stat-emoji">🏆</span>
           <div class="stat-value">${
             avgRank !== null ? `#${avgRank}` : "N/A"
           }</div>
           <div class="stat-label">Avg Rank</div>
-        </td>
-        <td class="stat-item">
-          <span class="stat-emoji">⭐</span>
-          <div class="stat-value">${topRankCount}</div>
-          <div class="stat-label">Top Rank (#1)</div>
         </td>
       </tr>
     </table>
