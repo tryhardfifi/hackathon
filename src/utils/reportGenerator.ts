@@ -1,10 +1,11 @@
-import { Report, CustomerPrompt } from '../types';
+import { Report, CustomerPrompt } from "../types";
 
 /**
  * Generate HTML report
  */
 export function generateHTMLReport(report: Report): string {
-  const visibilityClass = report.visibilityAnalysis.overallAssessment.toLowerCase();
+  const visibilityClass =
+    report.visibilityAnalysis.overallAssessment.toLowerCase();
 
   return `
 <!DOCTYPE html>
@@ -393,9 +394,15 @@ export function generateHTMLReport(report: Report): string {
       Generated: ${report.generatedDate}
     </div>
 
-    ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? generateResponseSummary(report.chatGPTResponses) : ''}
+    ${
+      report.chatGPTResponses && report.chatGPTResponses.length > 0
+        ? generateResponseSummary(report.chatGPTResponses)
+        : ""
+    }
 
-    ${report.chatGPTResponses && report.chatGPTResponses.length > 0 ? `
+    ${
+      report.chatGPTResponses && report.chatGPTResponses.length > 0
+        ? `
     ${generateSourceMentionsChart(report.chatGPTResponses, report.businessName)}
     ${generateSourceDomainPieChart(report.chatGPTResponses)}
     
@@ -403,9 +410,13 @@ export function generateHTMLReport(report: Report): string {
     <p>Here's how ChatGPT responds to these prompts and whether your business is mentioned:</p>
     
     <div class="section">
-      ${report.chatGPTResponses.map((response, idx) => generateResponseCard(response, idx)).join('\n')}
+      ${report.chatGPTResponses
+        .map((response, idx) => generateResponseCard(response, idx))
+        .join("\n")}
     </div>
-    ` : ''}
+    `
+        : ""
+    }
 
     <h2>🔍 Visibility Analysis</h2>
     <div class="section">
@@ -416,17 +427,23 @@ export function generateHTMLReport(report: Report): string {
 
       <h3>Key Factors</h3>
       <ul>
-        ${report.visibilityAnalysis.keyFactors.map((f) => `<li>${escapeHTML(f)}</li>`).join('\n')}
+        ${report.visibilityAnalysis.keyFactors
+          .map((f) => `<li>${escapeHTML(f)}</li>`)
+          .join("\n")}
       </ul>
 
       <h3>Current Strengths</h3>
       <ul>
-        ${report.visibilityAnalysis.strengths.map((s) => `<li>${escapeHTML(s)}</li>`).join('\n')}
+        ${report.visibilityAnalysis.strengths
+          .map((s) => `<li>${escapeHTML(s)}</li>`)
+          .join("\n")}
       </ul>
 
       <h3>Opportunities for Improvement</h3>
       <ul>
-        ${report.visibilityAnalysis.opportunities.map((o) => `<li>${escapeHTML(o)}</li>`).join('\n')}
+        ${report.visibilityAnalysis.opportunities
+          .map((o) => `<li>${escapeHTML(o)}</li>`)
+          .join("\n")}
       </ul>
     </div>
 
@@ -444,7 +461,7 @@ export function generateHTMLReport(report: Report): string {
       </div>
     `
       )
-      .join('\n')}
+      .join("\n")}
 
     <div class="footer">
       <p><strong>Disclaimer:</strong> This report is AI-generated and provides estimates based on available information. Actual visibility may vary based on many factors including content quality, user queries, and AI model training data.</p>
@@ -461,7 +478,7 @@ export function generateHTMLReport(report: Report): string {
  */
 export function generateTextReport(report: Report): string {
   let text = `GPT VISIBILITY REPORT
-${'='.repeat(60)}
+${"=".repeat(60)}
 
 Business: ${report.businessName}
 Generated: ${report.generatedDate}
@@ -469,7 +486,7 @@ Generated: ${report.generatedDate}
 `;
 
   text += `CUSTOMER PROMPT EXAMPLES
-${'-'.repeat(60)}
+${"-".repeat(60)}
 
 Here are realistic prompts that potential customers might use when
 asking ChatGPT for recommendations:
@@ -482,21 +499,29 @@ asking ChatGPT for recommendations:
     prompts.forEach((p) => {
       text += `  • ${p.prompt}\n`;
     });
-    text += '\n';
+    text += "\n";
   }
 
   if (report.chatGPTResponses && report.chatGPTResponses.length > 0) {
     text += `
 CHATGPT RESPONSE ANALYSIS
-${'-'.repeat(60)}
+${"-".repeat(60)}
 
 `;
-    const mentionedCount = report.chatGPTResponses.filter(r => r.businessMentioned).length;
-    text += `Mention Rate: ${mentionedCount}/${report.chatGPTResponses.length} (${Math.round((mentionedCount / report.chatGPTResponses.length) * 100)}%)\n\n`;
+    const mentionedCount = report.chatGPTResponses.filter(
+      (r) => r.businessMentioned
+    ).length;
+    text += `Mention Rate: ${mentionedCount}/${
+      report.chatGPTResponses.length
+    } (${Math.round(
+      (mentionedCount / report.chatGPTResponses.length) * 100
+    )}%)\n\n`;
 
     report.chatGPTResponses.forEach((response, idx) => {
       text += `${idx + 1}. ${response.prompt}\n`;
-      text += `   Status: ${response.businessMentioned ? '✓ Mentioned' : '✗ Not Mentioned'}\n`;
+      text += `   Status: ${
+        response.businessMentioned ? "✓ Mentioned" : "✗ Not Mentioned"
+      }\n`;
       if (response.businessMentioned && response.rank) {
         text += `   Rank: #${response.rank}\n`;
       }
@@ -506,30 +531,30 @@ ${'-'.repeat(60)}
           text += `     • ${source}\n`;
         });
       }
-      text += '\n';
+      text += "\n";
     });
   }
 
   text += `
 VISIBILITY ANALYSIS
-${'-'.repeat(60)}
+${"-".repeat(60)}
 
 Overall Assessment: ${report.visibilityAnalysis.overallAssessment} Visibility
 
 Key Factors:
-${report.visibilityAnalysis.keyFactors.map((f) => `  • ${f}`).join('\n')}
+${report.visibilityAnalysis.keyFactors.map((f) => `  • ${f}`).join("\n")}
 
 Current Strengths:
-${report.visibilityAnalysis.strengths.map((s) => `  • ${s}`).join('\n')}
+${report.visibilityAnalysis.strengths.map((s) => `  • ${s}`).join("\n")}
 
 Opportunities for Improvement:
-${report.visibilityAnalysis.opportunities.map((o) => `  • ${o}`).join('\n')}
+${report.visibilityAnalysis.opportunities.map((o) => `  • ${o}`).join("\n")}
 
 `;
 
   text += `
 RECOMMENDATIONS
-${'-'.repeat(60)}
+${"-".repeat(60)}
 
 Actionable steps to improve your visibility in AI assistant conversations:
 
@@ -543,7 +568,7 @@ ${rec.description}
   });
 
   text += `
-${'-'.repeat(60)}
+${"-".repeat(60)}
 
 DISCLAIMER: This report is AI-generated and provides estimates based on
 available information. Actual visibility may vary based on many factors
@@ -558,7 +583,9 @@ Generated by GPT Visibility Report Agent
 /**
  * Group prompts by category for better organization
  */
-function groupPromptsByCategory(prompts: CustomerPrompt[]): Record<string, CustomerPrompt[]> {
+function groupPromptsByCategory(
+  prompts: CustomerPrompt[]
+): Record<string, CustomerPrompt[]> {
   const grouped: Record<string, CustomerPrompt[]> = {};
 
   for (const prompt of prompts) {
@@ -575,16 +602,24 @@ function groupPromptsByCategory(prompts: CustomerPrompt[]): Record<string, Custo
  * Generate response summary statistics
  */
 function generateResponseSummary(responses: any[]): string {
-  const mentionedCount = responses.filter(r => r.businessMentioned).length;
+  const mentionedCount = responses.filter((r) => r.businessMentioned).length;
   const totalResponses = responses.length;
-  const mentionPercentage = totalResponses > 0 ? Math.round((mentionedCount / totalResponses) * 100) : 0;
-  
-  const mentionedResponses = responses.filter(r => r.businessMentioned);
-  const avgRank = mentionedResponses.length > 0
-    ? Math.round(mentionedResponses.reduce((sum, r) => sum + (r.rank || 0), 0) / mentionedResponses.length * 10) / 10
-    : null;
-  
-  const topRankCount = mentionedResponses.filter(r => r.rank === 1).length;
+  const mentionPercentage =
+    totalResponses > 0
+      ? Math.round((mentionedCount / totalResponses) * 100)
+      : 0;
+
+  const mentionedResponses = responses.filter((r) => r.businessMentioned);
+  const avgRank =
+    mentionedResponses.length > 0
+      ? Math.round(
+          (mentionedResponses.reduce((sum, r) => sum + (r.rank || 0), 0) /
+            mentionedResponses.length) *
+            10
+        ) / 10
+      : null;
+
+  const topRankCount = mentionedResponses.filter((r) => r.rank === 1).length;
 
   return `
     <table class="stats-summary" cellpadding="0" cellspacing="0" border="0">
@@ -601,7 +636,9 @@ function generateResponseSummary(responses: any[]): string {
         </td>
         <td class="stat-item">
           <span class="stat-emoji">🏆</span>
-          <div class="stat-value">${avgRank !== null ? `#${avgRank}` : 'N/A'}</div>
+          <div class="stat-value">${
+            avgRank !== null ? `#${avgRank}` : "N/A"
+          }</div>
           <div class="stat-label">Avg Rank</div>
         </td>
         <td class="stat-item">
@@ -617,12 +654,15 @@ function generateResponseSummary(responses: any[]): string {
 /**
  * Generate source mentions bar chart
  */
-function generateSourceMentionsChart(responses: any[], businessName: string): string {
+function generateSourceMentionsChart(
+  responses: any[],
+  businessName: string
+): string {
   // Extract all sources and count mentions
   const sourceCounts: Record<string, number> = {};
-  
+
   // Count all sources
-  responses.forEach(response => {
+  responses.forEach((response) => {
     if (response.sources && Array.isArray(response.sources)) {
       response.sources.forEach((source: string) => {
         if (source) {
@@ -631,16 +671,20 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
       });
     }
   });
-  
+
   // Extract business domain from sources (look for patterns like /blog/, /guide/, /about/)
   // Business sources typically have paths like /blog/..., /guide/..., etc.
   let businessDomains: string[] = [];
   const allSources = Object.keys(sourceCounts);
-  
+
   // Find potential business domains by looking for sources with blog/guide/about paths
-  allSources.forEach(source => {
-    if (source.includes('/blog/') || source.includes('/guide/') || 
-        source.includes('/about/') || source.includes('/resources/')) {
+  allSources.forEach((source) => {
+    if (
+      source.includes("/blog/") ||
+      source.includes("/guide/") ||
+      source.includes("/about/") ||
+      source.includes("/resources/")
+    ) {
       try {
         const url = new URL(source);
         if (!businessDomains.includes(url.hostname)) {
@@ -654,20 +698,32 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
       }
     }
   });
-  
+
   // Filter to only business sources (those with business domain or blog/guide paths)
   const businessSources = Object.entries(sourceCounts)
     .filter(([source]) => {
       // Check if source has business-like paths
-      if (source.includes('/blog/') || source.includes('/guide/') || 
-          source.includes('/about/') || source.includes('/resources/')) {
+      if (
+        source.includes("/blog/") ||
+        source.includes("/guide/") ||
+        source.includes("/about/") ||
+        source.includes("/resources/")
+      ) {
         // Make sure it's not a common third-party domain
-        const commonDomains = ['youtube.com', 'facebook.com', 'twitter.com', 
-                               'instagram.com', 'linkedin.com', 'reddit.com',
-                               'medium.com', 'wikipedia.org', 'amazon.com'];
+        const commonDomains = [
+          "youtube.com",
+          "facebook.com",
+          "twitter.com",
+          "instagram.com",
+          "linkedin.com",
+          "reddit.com",
+          "medium.com",
+          "wikipedia.org",
+          "amazon.com",
+        ];
         try {
           const url = new URL(source);
-          return !commonDomains.some(domain => url.hostname.includes(domain));
+          return !commonDomains.some((domain) => url.hostname.includes(domain));
         } catch (e) {
           return true; // If we can't parse, include it if it has business-like paths
         }
@@ -676,7 +732,7 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
     })
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10); // Top 10 sources
-  
+
   if (businessSources.length === 0) {
     return `
     <div class="source-chart">
@@ -685,21 +741,27 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
     </div>
     `;
   }
-  
+
   const maxCount = businessSources[0][1];
-  
-  const chartRows = businessSources.map(([source, count]) => {
-    // Calculate percentage based on the maximum count (so bars are proportional)
-    const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
-    const displaySource = source.length > 60 ? source.substring(0, 57) + '...' : source;
-    
-    // Ensure minimum width for visibility if count > 0
-    const barWidth = Math.max(percentage, count > 0 ? 2 : 0);
-    
-    return `
+
+  const chartRows = businessSources
+    .map(([source, count]) => {
+      // Calculate percentage based on the maximum count (so bars are proportional)
+      const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+      const displaySource =
+        source.length > 60 ? source.substring(0, 57) + "..." : source;
+
+      // Ensure minimum width for visibility if count > 0
+      const barWidth = Math.max(percentage, count > 0 ? 2 : 0);
+
+      return `
       <div class="source-chart-row">
         <div class="source-chart-label">
-          <a href="${escapeHTML(source)}" style="color: #4285f4; text-decoration: none;" target="_blank">${escapeHTML(displaySource)}</a>
+          <a href="${escapeHTML(
+            source
+          )}" style="color: #4285f4; text-decoration: none;" target="_blank">${escapeHTML(
+        displaySource
+      )}</a>
         </div>
         <div class="source-chart-bar-container">
           <div class="source-chart-bar-container-inner">
@@ -709,8 +771,9 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
         <div class="source-chart-value">${count}</div>
       </div>
     `;
-  }).join('');
-  
+    })
+    .join("");
+
   return `
     <div class="source-chart">
       <h2>📈 Top Mentioned Sources</h2>
@@ -726,14 +789,14 @@ function generateSourceMentionsChart(responses: any[], businessName: string): st
 function generateSourceDomainPieChart(responses: any[]): string {
   // Extract all sources and group by top-level domain
   const domainCounts: Record<string, number> = {};
-  
-  responses.forEach(response => {
+
+  responses.forEach((response) => {
     if (response.sources && Array.isArray(response.sources)) {
       response.sources.forEach((source: string) => {
         if (source) {
           try {
             const url = new URL(source);
-            const domain = url.hostname.replace(/^www\./, ''); // Remove www prefix
+            const domain = url.hostname.replace(/^www\./, ""); // Remove www prefix
             domainCounts[domain] = (domainCounts[domain] || 0) + 1;
           } catch (e) {
             // If URL parsing fails, try manual extraction
@@ -747,7 +810,7 @@ function generateSourceDomainPieChart(responses: any[]): string {
       });
     }
   });
-  
+
   if (Object.keys(domainCounts).length === 0) {
     return `
     <div class="pie-chart-container">
@@ -756,27 +819,37 @@ function generateSourceDomainPieChart(responses: any[]): string {
     </div>
     `;
   }
-  
+
   // Sort by count and take top domains
   const sortedDomains = Object.entries(domainCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12); // Top 12 domains
-  
+
   const total = sortedDomains.reduce((sum, [, count]) => sum + count, 0);
-  
+
   // Color palette for pie chart segments
   const colors = [
-    '#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d00',
-    '#9c27b0', '#00acc1', '#8bc34a', '#ff5722', '#607d8b',
-    '#795548', '#3f51b5'
+    "#4285f4",
+    "#ea4335",
+    "#fbbc04",
+    "#34a853",
+    "#ff6d00",
+    "#9c27b0",
+    "#00acc1",
+    "#8bc34a",
+    "#ff5722",
+    "#607d8b",
+    "#795548",
+    "#3f51b5",
   ];
-  
+
   // Generate legend
-  const legendItems = sortedDomains.map(([domain, count], index) => {
-    const percentage = ((count / total) * 100).toFixed(1);
-    const color = colors[index % colors.length];
-    
-    return `
+  const legendItems = sortedDomains
+    .map(([domain, count], index) => {
+      const percentage = ((count / total) * 100).toFixed(1);
+      const color = colors[index % colors.length];
+
+      return `
       <div class="pie-legend-item">
         <div class="pie-legend-color" style="background-color: ${color};"></div>
         <div class="pie-legend-label">${escapeHTML(domain)}</div>
@@ -784,8 +857,9 @@ function generateSourceDomainPieChart(responses: any[]): string {
         <div class="pie-legend-percentage">${percentage}%</div>
       </div>
     `;
-  }).join('');
-  
+    })
+    .join("");
+
   return `
     <div class="pie-chart-container">
       <h2>🥧 Source Distribution by Domain</h2>
@@ -803,23 +877,28 @@ function generateSourceDomainPieChart(responses: any[]): string {
  */
 function generateResponseCard(response: any, index: number): string {
   const isMentioned = response.businessMentioned;
-  const cardClass = isMentioned ? 'mentioned' : 'not-mentioned';
-  const statusClass = isMentioned ? 'mentioned' : 'not-mentioned';
-  const statusText = isMentioned ? '✓ Mentioned' : '✗ Not Mentioned';
-  
-  let rankHTML = '';
+  const cardClass = isMentioned ? "mentioned" : "not-mentioned";
+  const statusClass = isMentioned ? "mentioned" : "not-mentioned";
+  const statusText = isMentioned ? "✓ Mentioned" : "✗ Not Mentioned";
+
+  let rankHTML = "";
   if (isMentioned && response.rank !== null) {
     rankHTML = `<span class="rank-badge">Rank #${response.rank}</span>`;
   }
 
-  let sourcesHTML = '';
+  let sourcesHTML = "";
   if (response.sources && response.sources.length > 0) {
     sourcesHTML = `
       <div class="sources">
         <div class="sources-label">Sources Used:</div>
-        ${response.sources.map((source: string) => 
-          `<a href="${escapeHTML(source)}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
-        ).join('')}
+        ${response.sources
+          .map(
+            (source: string) =>
+              `<a href="${escapeHTML(
+                source
+              )}" class="source-link" target="_blank">${escapeHTML(source)}</a>`
+          )
+          .join("")}
       </div>
     `;
   }
@@ -841,9 +920,9 @@ function generateResponseCard(response: any, index: number): string {
  */
 function escapeHTML(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
