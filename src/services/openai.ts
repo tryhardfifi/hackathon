@@ -461,7 +461,7 @@ Only return the JSON object, no additional text.`;
     postContent: string,
     businessInfo: BusinessInfo
   ): Promise<string> {
-    const prompt = `You are an expert at crafting helpful, authentic Reddit comments that promote a business without being spammy or overly promotional.
+    const prompt = `You are an expert at writing authentic Reddit comments that sound like a real Redditor wrote them - casual, low-key, and natural.
 
 Reddit Post Title:
 ${redditTitle}
@@ -475,14 +475,23 @@ Business Information:
 - Industry: ${businessInfo.industry}
 - Target Customers: ${businessInfo.targetCustomers}
 
-Your task: Generate a genuine, helpful comment that the business owner could post on this Reddit thread to promote their business. The comment should:
-1. Be authentic and contribute value to the discussion
-2. Naturally mention or relate to their business
-3. Not be overly salesy or promotional
-4. Feel like a real person's comment, not marketing copy
-5. Address what the original post is about and provide helpful, relevant information
+Your task: Write a comment that a real Redditor would post. The comment should:
+1. Sound completely natural and human - like someone casually sharing their experience or knowledge
+2. Be low-key and understated (Redditors don't like overly enthusiastic or salesy language)
+3. Use casual language, maybe some internet slang or abbreviations (like "tbh", "imo", "fwiw", "imo" - but not overdoing it)
+4. Naturally weave in the business without it feeling like an ad
+5. Respond authentically to what the OP is asking about
+6. Keep it short and conversational (2-4 sentences max)
+7. Sound like you're genuinely helping, not selling
 
-Write only the comment text itself - no explanations, no quotes, just the comment that should be posted. Make it 2-4 sentences, conversational and helpful.`;
+IMPORTANT: 
+- Avoid corporate speak, marketing jargon, or promotional language
+- Don't use phrases like "we offer", "our solution", "contact us" - those sound like ads
+- Write like you're a person sharing something helpful, not a business promoting itself
+- Use contractions, casual phrasing, maybe even some Reddit-style humor if appropriate
+- The business mention should feel accidental or like a helpful recommendation, not intentional promotion
+
+Write ONLY the comment text - no quotes, no explanations, nothing extra. Just the raw comment as if you're typing it on Reddit right now.`;
 
     try {
       const response = await this.client.chat.completions.create({
@@ -490,7 +499,7 @@ Write only the comment text itself - no explanations, no quotes, just the commen
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at writing authentic, helpful Reddit comments that naturally promote businesses without being spammy.',
+            content: 'You write Reddit comments that sound exactly like a real Redditor - casual, low-key, using natural language with contractions and sometimes internet slang. You avoid corporate speak, marketing jargon, and anything that sounds promotional. Comments feel like someone casually sharing their experience, not a business trying to sell something.',
           },
           {
             role: 'user',
