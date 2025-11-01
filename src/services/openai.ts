@@ -16,7 +16,7 @@ export class OpenAIService {
    * Generate customer prompts that people might use when asking ChatGPT
    */
   async generateCustomerPrompts(businessInfo: BusinessInfo): Promise<CustomerPrompt[]> {
-    const prompt = `Given the following business information, generate 2 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this TYPE of business.
+    const prompt = `Given the following business information, generate 5-7 realistic customer prompts that someone might use when asking ChatGPT for recommendations or information related to this TYPE of business.
 
 Business Context (use this to understand what the business does):
 ${formatBusinessInfoForPrompt(businessInfo)}
@@ -37,7 +37,10 @@ Return the response as a JSON array with objects containing "category" and "prom
 Example format:
 [
   {"category": "Finding a business", "prompt": "What are the best coffee roasters in Portland?"},
-  {"category": "Comparing options", "prompt": "How do specialty coffee roasters differ from regular ones?"}
+  {"category": "Comparing options", "prompt": "How do specialty coffee roasters differ from regular ones?"},
+  {"category": "Product needs", "prompt": "Where can I find freshly roasted single-origin beans?"},
+  {"category": "Quality inquiry", "prompt": "What makes a good specialty coffee roaster?"},
+  {"category": "Local recommendations", "prompt": "Best places to buy artisan coffee in Portland?"}
 ]
 
 Only return the JSON array, no additional text.`;
