@@ -1,0 +1,83 @@
+{
+  "chatGPTResponses": [
+    {
+      "prompt": "What are the best coffee roasters in Portland?",
+      "businessMentioned": true,
+      "rank": 1,
+      "sources": [
+        "https://www.acmecoffee.example.com/blog/top-10-coffee-roasters-in-portland",
+        "https://www.coffeegeek.com",
+        "https://www.perfectdailygrind.com",
+        "https://www.sprudge.com"
+      ]
+    },
+    {
+      "prompt": "Recommend specialty coffee roasters in Oregon",
+      "businessMentioned": true,
+      "rank": 2,
+      "sources": [
+        "https://www.acmecoffee.example.com/guide/sustainable-coffee-sourcing",
+        "https://www.coffeeandcocoa.net",
+        "https://www.homegrounds.co"
+      ]
+    },
+    {
+      "prompt": "How do specialty coffee roasters differ from regular ones?",
+      "businessMentioned": false,
+      "rank": null,
+      "sources": [
+        "https://www.coffeegeek.com",
+        "https://www.perfectdailygrind.com"
+      ]
+    },
+    {
+      "prompt": "What makes a coffee roaster sustainable?",
+      "businessMentioned": true,
+      "rank": 3,
+      "sources": [
+        "https://www.acmecoffee.example.com/blog/best-direct-trade-beans",
+        "https://www.sprudge.com",
+        "https://www.coffeegeek.com"
+      ]
+    },
+    {
+      "prompt": "Where can I find direct-trade coffee beans in Portland?",
+      "businessMentioned": true,
+      "rank": 1,
+      "sources": [
+        "https://www.acmecoffee.example.com/blog/best-direct-trade-beans",
+        "https://www.acmecoffee.example.com/about/our-roasting-process",
+        "https://www.perfectdailygrind.com"
+      ]
+    },
+    {
+      "prompt": "Looking for coffee roasters with subscription services",
+      "businessMentioned": true,
+      "rank": 4,
+      "sources": [
+        "https://www.acmecoffee.example.com/blog/how-to-brew-specialty-coffee",
+        "https://www.coffeeandcocoa.net"
+      ]
+    },
+    {
+      "prompt": "Which Portland coffee roasters have the best reputation?",
+      "businessMentioned": true,
+      "rank": 2,
+      "sources": [
+        "https://www.acmecoffee.example.com/about/our-roasting-process",
+        "https://www.sprudge.com",
+        "https://www.coffeegeek.com",
+        "https://www.homegrounds.co"
+      ]
+    },
+    {
+      "prompt": "Best local coffee roasters near downtown Portland",
+      "businessMentioned": false,
+      "rank": null,
+      "sources": [
+        "https://www.perfectdailygrind.com",
+        "https://www.coffeeandcocoa.net"
+      ]
+    }
+  ]
+}

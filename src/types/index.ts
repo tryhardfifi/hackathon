@@ -26,11 +26,19 @@ export interface Recommendation {
   priority: number;
 }
 
+export interface ChatGPTResponse {
+  prompt: string;
+  businessMentioned: boolean;
+  rank: number | null; // null if not mentioned, 1-based if mentioned
+  sources: string[]; // URLs used in the response
+}
+
 export interface Report {
   businessName: string;
   generatedDate: string;
   customerPrompts: CustomerPrompt[];
   visibilityAnalysis: VisibilityAnalysis;
+  chatGPTResponses: ChatGPTResponse[];
   recommendations: Recommendation[];
 }
 

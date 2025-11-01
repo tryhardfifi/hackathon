@@ -70,6 +70,37 @@ export class AgentMailService {
   }
 
   /**
+   * Send a new email to a recipient
+   */
+  async sendEmail(
+    to: string,
+    subject: string,
+    htmlContent: string,
+    textContent: string
+  ): Promise<void> {
+    try {
+      console.log(`Sending email to ${to}...`);
+      console.log(`  Subject: ${subject}`);
+      console.log(`  Inbox: ${this.inboxId}`);
+      console.log(`  HTML length: ${htmlContent.length} chars`);
+      console.log(`  Text length: ${textContent.length} chars`);
+
+      const response = await this.client.inboxes.messages.send(this.inboxId, {
+        to,
+        subject,
+        html: htmlContent,
+        text: textContent,
+      });
+
+      console.log(`✓ Email sent successfully`);
+      console.log(`  Response:`, JSON.stringify(response, null, 2));
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update message labels
    */
   async updateMessageLabels(
